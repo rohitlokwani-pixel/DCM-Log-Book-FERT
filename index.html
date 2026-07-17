@@ -172,6 +172,7 @@ canvas.sigpad{width:100%;height:120px;border:1.5px solid var(--border);border-ra
       <video id="qr_video" style="display:none" playsinline></video>
       <canvas id="qr_canvas" style="display:none"></canvas>
       <button class="btn btn-blue" id="qr_scan_btn" onclick="startQrScan()">📷 Start Camera Scan</button>
+      <button class="btn btn-outline" id="qr_switch_btn" onclick="switchQrCamera()" style="display:none">🔄 Switch Camera (front/back)</button>
       <button class="btn btn-outline" id="qr_demo_btn" onclick="simulateQrScan()" style="display:none">✔️ Manual Verification (camera unavailable)</button>
     </div>
   </div>
@@ -602,23 +603,47 @@ function onEntryContextChange(){
     document.getElementById("qr_box").classList.remove("scanned");
     document.getElementById("qr_status").textContent="Scan the QR code posted at the CCP unit to unlock this shift's entries.";
     document.getElementById("qr_scan_btn").style.display="block";
+    document.getElementById("qr_switch_btn").style.display="none";
     document.getElementById("qr_demo_btn").style.display="none";
   }
 }
 
+let qrFacingMode = "environment"; // back camera by default; toggled by the switch button
+
 async function startQrScan(){
   const video=document.getElementById("qr_video");
   try{
-    qrStream = await navigator.mediaDevices.getUserMedia({video:{facingMode:"environment"}});
+    if(qrStream){ qrStream.getTracks().forEach(t=>t.stop()); }
+    // Request HD resolution — low default resolution (640x480) is the most common
+    // reason QR decoding fails even when the camera preview looks fine.
+    qrStream = await navigator.mediaDevices.getUserMedia({
+      video:{ facingMode: qrFacingMode, width:{ideal:1280}, height:{ideal:720} }
+    });
     video.srcObject=qrStream; video.style.display="block"; video.play();
     document.getElementById("qr_scan_btn").style.display="none";
-    document.getElementById("qr_status").textContent="Point camera at the QR code...";
+    document.getElementById("qr_switch_btn").style.display="block";
+    document.getElementById("qr_status").textContent="Point camera at the QR code — hold steady 15–30 cm away.";
     scanQrLoop();
   }catch(e){
+    // Some devices reject the resolution request — retry once with no constraints
+    try{
+      qrStream = await navigator.mediaDevices.getUserMedia({video:{facingMode:qrFacingMode}});
+      video.srcObject=qrStream; video.style.display="block"; video.play();
+      document.getElementById("qr_scan_btn").style.display="none";
+      document.getElementById("qr_switch_btn").style.display="block";
+      document.getElementById("qr_status").textContent="Point camera at the QR code — hold steady 15–30 cm away.";
+      scanQrLoop();
+      return;
+    }catch(e2){}
     document.getElementById("qr_status").textContent="⚠️ Camera access unavailable — please open the logbook via its official app link (https) in Chrome, or use manual verification below.";
     document.getElementById("qr_demo_btn").style.display="block";
   }
 }
+function switchQrCamera(){
+  qrFacingMode = qrFacingMode==="environment" ? "user" : "environment";
+  startQrScan();
+}
+
 function scanQrLoop(){
   const video=document.getElementById("qr_video"), canvas=document.getElementById("qr_canvas"), ctx=canvas.getContext("2d");
   function tick(){
@@ -646,6 +671,7 @@ function onQrSuccess(simulated){
   qrScannedShifts[key]=true;
   if(qrStream){ qrStream.getTracks().forEach(t=>t.stop()); }
   document.getElementById("qr_video").style.display="none";
+  document.getElementById("qr_switch_btn").style.display="none";
   document.getElementById("qr_box").classList.add("scanned");
   document.getElementById("qr_status").textContent="✅ Verified"+(simulated?" (manual)":" (QR scan)")+" at "+new Date().toLocaleTimeString();
   log_audit(currentUser,"QR scan (shift start)",key+(simulated?" [MANUAL VERIFICATION — camera unavailable]":""));
