@@ -1,0 +1,1361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>DCM Shriram — CCP Urea Plant Logbook</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:#f0f4ff;color:#1a2340;min-height:100vh;padding-bottom:70px}
+:root{--navy:#0a1628;--blue:#1565c0;--light:#f0f4ff;--border:#dde3ee;--text:#1a2340;--muted:#6b7a99;--alert:#e63946;--warn:#f4a261;--ok:#2d6a4f;--gold:#f4a261;}
+#login_screen{position:fixed;inset:0;background:var(--navy);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;overflow-y:auto}
+.login-logo{font-size:40px;margin-bottom:6px}
+.login-co{font-size:17px;font-weight:800;color:#fff;text-align:center}
+.login-dept{font-size:11px;color:rgba(255,255,255,.55);text-align:center;margin-bottom:14px}
+.login-card{background:#fff;border-radius:16px;padding:20px;width:100%;max-width:340px;box-shadow:0 8px 40px rgba(0,0,0,.3);margin-bottom:10px}
+.role-tabs{display:flex;gap:6px;margin-bottom:12px}
+.role-tab{flex:1;padding:8px 2px;border-radius:8px;border:1.5px solid rgba(255,255,255,.25);background:transparent;color:rgba(255,255,255,.7);font-size:11px;font-weight:700;cursor:pointer}
+.role-tab.active{background:var(--gold);color:#7c3a0a;border-color:var(--gold)}
+.login-title{font-size:14px;font-weight:700;color:var(--navy);margin-bottom:3px;text-align:center}
+.login-sub{font-size:10px;color:var(--muted);text-align:center;margin-bottom:12px}
+.login-inp{width:100%;padding:10px 13px;border-radius:10px;border:1.5px solid var(--border);font-size:13px;margin-bottom:9px;background:#fafbff}
+.login-btn{width:100%;padding:12px;border-radius:10px;border:none;background:var(--blue);color:#fff;font-size:14px;font-weight:700;cursor:pointer}
+.login-err{color:var(--alert);font-size:11px;text-align:center;margin-bottom:6px;min-height:16px;font-weight:600}
+.header{background:var(--blue);color:#fff;padding:0;position:sticky;top:0;z-index:100}
+.header-top{padding:10px 14px 6px;display:flex;justify-content:space-between;align-items:flex-start}
+.h-left .co{font-size:13px;font-weight:800}
+.h-left .dept{font-size:10px;color:rgba(255,255,255,.6)}
+.h-right{display:flex;flex-direction:column;align-items:flex-end;gap:2px}
+.r-badge{font-size:10px;padding:2px 8px;border-radius:10px;font-weight:700}
+.badge-operator{background:#90caf9;color:#0d47a1}
+.badge-incharge{background:#c8e6c9;color:#1b5e20}
+.badge-admin{background:var(--gold);color:#7c3a0a}
+.tabs{display:flex;border-top:1px solid rgba(255,255,255,.15);overflow-x:auto}
+.tab{flex:1;min-width:60px;padding:9px 2px;font-size:9px;font-weight:500;color:rgba(255,255,255,.55);background:transparent;border:none;cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap}
+.tab.active{color:#fff;font-weight:700;border-bottom:2px solid #90caf9}
+.body{padding:12px}
+.card{background:#fff;border-radius:12px;border:1px solid var(--border);padding:13px;margin-bottom:10px;box-shadow:0 1px 5px rgba(0,0,0,.05)}
+.ct{font-size:11px;font-weight:700;color:var(--blue);text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px}
+label.lbl{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:3px;display:block}
+input[type=text],input[type=date],input[type=time],input[type=number],input[type=password],select,textarea{width:100%;padding:9px 11px;border-radius:8px;border:1.5px solid var(--border);font-size:13px;margin-bottom:9px;background:#fafbff;color:var(--text)}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.row2 input,.row2 select{margin-bottom:0}
+.btn{width:100%;padding:12px;border-radius:10px;border:none;font-size:13px;font-weight:700;cursor:pointer;margin-bottom:8px}
+.btn-blue{background:var(--blue);color:#fff}
+.btn-navy{background:var(--navy);color:#fff}
+.btn-green{background:var(--ok);color:#fff}
+.btn-red{background:var(--alert);color:#fff}
+.btn-outline{background:#fff;border:1.5px solid var(--border);color:var(--text)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.badge{display:inline-block;padding:3px 9px;border-radius:20px;font-size:10px;font-weight:700}
+.b-ok{background:#d4edda;color:#155724}
+.b-alert{background:#fde8e8;color:#c0392b}
+.b-pending{background:#fff3cd;color:#856404}
+.b-rejected{background:#f8d7da;color:#721c24}
+.sec-tabs{display:flex;gap:6px;margin-bottom:10px;overflow-x:auto}
+.sec-tab{padding:8px 12px;border-radius:8px;border:1.5px solid var(--border);background:#fafbff;font-size:11px;font-weight:700;color:var(--muted);white-space:nowrap;cursor:pointer}
+.sec-tab.active{background:var(--blue);color:#fff;border-color:var(--blue)}
+.sec-page{display:none}.sec-page.active{display:block}
+.gauge-field{border:1.5px solid var(--border);border-radius:10px;padding:10px;margin-bottom:9px;background:#fafbff}
+.gauge-field.hot{border-color:var(--alert);background:#fff5f5}
+.gauge-name{font-size:12px;font-weight:700;color:var(--text);margin-bottom:5px;display:flex;justify-content:space-between}
+.gauge-limit{font-size:9px;color:var(--muted);font-weight:600}
+.qr-box{border:2px dashed var(--border);border-radius:12px;padding:16px;text-align:center;margin-bottom:10px}
+.qr-box.scanned{border-color:var(--ok);background:#f0fff4}
+video{width:100%;border-radius:10px;background:#000;max-height:220px}
+canvas.sigpad{width:100%;height:120px;border:1.5px solid var(--border);border-radius:8px;background:#fff;touch-action:none}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--navy);color:#fff;padding:10px 22px;border-radius:24px;font-size:12px;font-weight:600;z-index:9999;box-shadow:0 4px 20px rgba(0,0,0,.25);white-space:nowrap;display:none;max-width:90vw;text-align:center}
+.page{display:none}.page.active{display:block}
+.rc{background:#fff;border-radius:10px;border:1px solid var(--border);padding:11px;margin-bottom:9px}
+.rh{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px}
+.rt{font-size:13px;font-weight:700;color:var(--blue)}
+.rs{font-size:10px;color:var(--muted);margin-top:2px}
+.mt{width:100%;font-size:11px;border-collapse:collapse;margin-top:6px}
+.mt td{padding:3px 4px;border-bottom:1px solid #f0f2f8}
+.mt .k{color:var(--muted);font-weight:600}
+.mt .v.hot{color:var(--alert);font-weight:700}
+.incident-btn{position:fixed;bottom:76px;right:14px;background:var(--alert);color:#fff;border:none;border-radius:50%;width:54px;height:54px;font-size:22px;box-shadow:0 4px 16px rgba(230,57,70,.5);z-index:500;cursor:pointer}
+.chip{display:inline-flex;align-items:center;gap:4px;background:#e3f2fd;border-radius:6px;padding:4px 9px;font-size:11px;color:var(--blue);font-weight:700;margin:2px;cursor:pointer}
+.empty{text-align:center;padding:30px 16px;color:var(--muted);font-size:12px}
+.at{font-size:11px;font-weight:700;color:#7c3a0a;text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px}
+.as{background:#fff9f0;border:1px solid #ffd699;border-radius:10px;padding:12px;margin-bottom:10px}
+.mini{font-size:10px;color:var(--muted);line-height:1.5;margin-top:4px}
+.audit-row{font-size:11px;padding:6px 0;border-bottom:1px solid #f0f2f8}
+.stat-card{border:1.5px solid var(--border);border-radius:10px;padding:9px;background:#fafbff}
+.stat-name{font-size:10px;font-weight:700;color:var(--muted);margin-bottom:3px}
+.stat-val{font-size:15px;font-weight:800}
+.stat-range{font-size:9px;color:var(--muted);margin-top:2px}
+.stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.pill{display:inline-block;font-size:8px;font-weight:800;padding:2px 6px;border-radius:8px;margin-top:3px}
+.pill-ok{background:#d4edda;color:#155724}
+.pill-high{background:#fde8e8;color:#c0392b}
+.pill-low{background:#e3f2fd;color:#0d47a1}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login_screen">
+  <div class="login-logo">🏭</div>
+  <div class="login-co">DCM Shriram Limited</div>
+  <div class="login-dept">CCP Urea Plant · Hourly Digital Logbook</div>
+
+  <div class="login-card">
+    <div class="role-tabs">
+      <button class="role-tab active" onclick="setLoginRole('operator',this)">👷 Operator</button>
+      <button class="role-tab" onclick="setLoginRole('incharge',this)">🧑‍✈️ Incharge</button>
+      <button class="role-tab" onclick="setLoginRole('admin',this)">👑 Admin</button>
+    </div>
+    <div id="operator_login">
+      <div class="login-title">Shift Operator Login</div>
+      <div class="login-sub">Select your name and enter password</div>
+      <select class="login-inp" id="op_name">
+        <option value="">-- Select Name --</option>
+        <option>Rohit</option>
+      </select>
+      <input class="login-inp" type="password" id="op_pass" placeholder="Enter your password">
+    </div>
+    <div id="incharge_login" style="display:none">
+      <div class="login-title">Shift Incharge Login</div>
+      <div class="login-sub">Shared login — you'll enter your name at review time</div>
+      <input class="login-inp" type="password" id="inc_pass" placeholder="Enter incharge password">
+    </div>
+    <div id="admin_login" style="display:none">
+      <div class="login-title">Admin Login</div>
+      <div class="login-sub">Full configuration access</div>
+      <input class="login-inp" type="password" id="adm_pass" placeholder="Enter admin password">
+    </div>
+    <div class="login-err" id="login_err"></div>
+    <button class="login-btn" onclick="doLogin()">Login →</button>
+  </div>
+</div>
+
+<!-- MAIN APP -->
+<div id="main_app" style="display:none">
+<div class="header">
+  <div class="header-top">
+    <div class="h-left">
+      <div class="co">🏭 CCP Urea Plant Logbook</div>
+      <div class="dept">Instrumentation · Hourly Readings</div>
+    </div>
+    <div class="h-right">
+      <span class="r-badge" id="role_badge">Role</span>
+      <span style="font-size:10px;color:rgba(255,255,255,.6)" id="who_line"></span>
+      <button onclick="doLogout()" style="background:none;border:none;color:rgba(255,255,255,.4);font-size:10px;cursor:pointer;padding:0">Logout</button>
+    </div>
+  </div>
+  <div class="tabs" id="tabs_row"></div>
+</div>
+
+<div class="body">
+
+<!-- ENTRY -->
+<div class="page" id="page_entry">
+  <div class="card">
+    <div class="ct">🕐 Select Hour to Log</div>
+    <div class="row2" style="margin-bottom:9px">
+      <div><label class="lbl">Date</label><input type="date" id="e_date" onchange="onEntryContextChange()"></div>
+      <div><label class="lbl">Hour</label><select id="e_hour" onchange="onEntryContextChange()"></select></div>
+    </div>
+    <div id="shift_indicator" style="font-size:11px;font-weight:700;color:var(--blue)"></div>
+  </div>
+
+  <div class="card" id="qr_card">
+    <div class="ct">📷 Shift Start Verification</div>
+    <p class="mini" style="margin-bottom:8px">Scan once at the start of your shift — unlocks hourly entry for every hour in this shift without scanning again.</p>
+    <div class="qr-box" id="qr_box">
+      <div id="qr_status" style="font-size:12px;color:var(--muted);margin-bottom:8px">Scan the QR code posted at the CCP unit to unlock this shift's entries.</div>
+      <video id="qr_video" style="display:none" playsinline></video>
+      <canvas id="qr_canvas" style="display:none"></canvas>
+      <button class="btn btn-blue" id="qr_scan_btn" onclick="startQrScan()">📷 Start Camera Scan</button>
+      <button class="btn btn-outline" id="qr_demo_btn" onclick="simulateQrScan()" style="display:none">✔️ Manual Verification (camera unavailable)</button>
+    </div>
+  </div>
+
+  <div class="card" id="sig_card" style="display:none">
+    <div class="ct">✍️ Shift Start Signature</div>
+    <p class="mini" style="margin-bottom:8px">Sign once at shift start — covers all hourly entries you log during this shift.</p>
+    <canvas class="sigpad" id="sig_pad"></canvas>
+    <div style="display:flex;gap:8px;margin-top:8px">
+      <button class="btn btn-outline" style="margin-bottom:0" onclick="clearSig('sig_pad')">Clear</button>
+    </div>
+    <button class="btn btn-green" style="margin-top:8px" onclick="confirmShiftSignatureAndUnlock()">✅ Confirm Signature & Start Logging</button>
+  </div>
+
+  <div id="entry_sections" style="display:none">
+    <div class="sec-tabs" id="sec_tabs"></div>
+    <div id="sec_pages"></div>
+    <div class="card">
+      <label class="lbl">Remarks (optional)</label>
+      <textarea id="e_rem" rows="2" placeholder="Any observations for this hour..."></textarea>
+      <button class="btn btn-green" onclick="submitHourEntry()">✅ Submit This Hour's Reading</button>
+    </div>
+  </div>
+</div>
+
+<!-- RECORDS -->
+<div class="page" id="page_records">
+  <div class="card">
+    <div class="ct">📁 Hourly Entries</div>
+    <div id="records_list"></div>
+  </div>
+</div>
+
+<!-- ANALYSIS -->
+<div class="page" id="page_analysis">
+  <div class="card">
+    <div class="ct">🎯 Current Readings (by section)</div>
+    <div style="display:flex;gap:6px;margin-bottom:8px">
+      <button class="sec-tab active" id="statmode_latest" onclick="setStatMode('latest')">🕐 Latest Hour</button>
+      <button class="sec-tab" id="statmode_avg" onclick="setStatMode('avg')">📅 Period Average</button>
+    </div>
+    <div class="row2" id="statavg_range" style="display:none;margin-bottom:8px">
+      <div><label class="lbl">From</label><input type="date" id="statavg_from" onchange="onStatAvgRangeChange()"></div>
+      <div><label class="lbl">To</label><input type="date" id="statavg_to" onchange="onStatAvgRangeChange()"></div>
+    </div>
+    <div class="sec-tabs" id="stat_sec_tabs"></div>
+    <div id="stat_cards"></div>
+  </div>
+
+  <div class="card">
+    <div class="ct">📊 Multi-Tag Comparison</div>
+    <p class="mini" style="margin-bottom:8px">Select tags sharing similar units to compare directly.</p>
+    <div id="bar_tag_select" style="margin-bottom:8px"></div>
+    <label class="lbl">Shift</label>
+    <select id="bar_shift_filter" onchange="renderBarChart()" style="margin-bottom:8px">
+      <option value="All">All Shifts (averaged)</option>
+      <option value="Morning">Morning only</option>
+      <option value="Afternoon">Afternoon only</option>
+      <option value="Night">Night only</option>
+    </select>
+    <div class="row2" style="margin-bottom:8px">
+      <div><label class="lbl">From</label><input type="date" id="bar_from" onchange="onBarRangeChange()"></div>
+      <div><label class="lbl">To</label><input type="date" id="bar_to" onchange="onBarRangeChange()"></div>
+    </div>
+    <div style="display:flex;gap:6px;margin-bottom:8px">
+      <button class="btn btn-outline" style="margin-bottom:0;flex:1" onclick="setBarPreset(7)">Last 7d</button>
+      <button class="btn btn-outline" style="margin-bottom:0;flex:1" onclick="setBarPreset(15)">Last 15d</button>
+      <button class="btn btn-outline" style="margin-bottom:0;flex:1" onclick="setBarPreset(30)">Last 30d</button>
+    </div>
+    <div style="overflow-x:auto;border:1px solid var(--border);border-radius:8px;padding:6px 2px" id="bar_scroll_wrap">
+      <div id="bar_canvas_holder"><canvas id="bar_chart" height="180"></canvas></div>
+    </div>
+    <div class="mini" id="bar_range_note"></div>
+  </div>
+
+  <div class="card">
+    <div class="ct">📈 Trend (select up to 6 tags)</div>
+    <div id="trend_select" style="margin-bottom:8px"></div>
+    <div class="row2" style="margin-bottom:8px">
+      <div><label class="lbl">From</label><input type="date" id="trend_from" onchange="onTrendRangeChange()"></div>
+      <div><label class="lbl">To</label><input type="date" id="trend_to" onchange="onTrendRangeChange()"></div>
+    </div>
+    <div style="display:flex;gap:6px;margin-bottom:8px">
+      <button class="btn btn-outline" style="margin-bottom:0;flex:1" onclick="setTrendPreset(1)">Today</button>
+      <button class="btn btn-outline" style="margin-bottom:0;flex:1" onclick="setTrendPreset(7)">Last 7d</button>
+      <button class="btn btn-outline" style="margin-bottom:0;flex:1" onclick="setTrendPreset(15)">Last 15d</button>
+      <button class="btn btn-outline" style="margin-bottom:0;flex:1" onclick="setTrendPreset(30)">Last 30d</button>
+    </div>
+    <div style="overflow-x:auto;border:1px solid var(--border);border-radius:8px;padding:6px 2px" id="trend_scroll_wrap">
+      <div id="trend_canvas_holder"><canvas id="trend_chart" height="200"></canvas></div>
+    </div>
+    <div class="mini" id="trend_range_note"></div>
+  </div>
+
+  <div class="card">
+    <div class="ct">📐 Min / Max / Avg Summary</div>
+    <div class="row2" style="margin-bottom:8px">
+      <div><label class="lbl">From</label><input type="date" id="summary_from" onchange="onSummaryRangeChange()"></div>
+      <div><label class="lbl">To</label><input type="date" id="summary_to" onchange="onSummaryRangeChange()"></div>
+    </div>
+    <div style="display:flex;gap:6px;margin-bottom:8px">
+      <button class="btn btn-outline" style="margin-bottom:0;flex:1" onclick="setSummaryPreset(7)">Last 7d</button>
+      <button class="btn btn-outline" style="margin-bottom:0;flex:1" onclick="setSummaryPreset(15)">Last 15d</button>
+      <button class="btn btn-outline" style="margin-bottom:0;flex:1" onclick="setSummaryPreset(30)">Last 30d</button>
+    </div>
+    <div style="overflow-x:auto"><table class="mt" id="summary_table" style="width:100%"></table></div>
+  </div>
+
+  <div class="card">
+    <div class="ct">🔗 Correlation View</div>
+    <div class="row2" style="margin-bottom:8px">
+      <div><label class="lbl">Tag X</label><select id="corr_x_select" onchange="renderCorrelationChart()"></select></div>
+      <div><label class="lbl">Tag Y</label><select id="corr_y_select" onchange="renderCorrelationChart()"></select></div>
+    </div>
+    <div class="row2" style="margin-bottom:8px">
+      <div><label class="lbl">From</label><input type="date" id="corr_from" onchange="onCorrRangeChange()"></div>
+      <div><label class="lbl">To</label><input type="date" id="corr_to" onchange="onCorrRangeChange()"></div>
+    </div>
+    <div style="display:flex;gap:6px;margin-bottom:8px">
+      <button class="btn btn-outline" style="margin-bottom:0;flex:1" onclick="setCorrPreset(15)">Last 15d</button>
+      <button class="btn btn-outline" style="margin-bottom:0;flex:1" onclick="setCorrPreset(30)">Last 30d</button>
+    </div>
+    <canvas id="corr_chart" height="220"></canvas>
+    <div class="mini" id="corr_range_note"></div>
+  </div>
+
+  <div class="card">
+    <div class="ct">🚨 Alert Summary</div>
+    <div id="alert_summary"></div>
+  </div>
+
+  <div class="card">
+    <div class="ct">📄 Export This Analysis</div>
+    <button class="btn btn-navy" id="analysis_pdf_btn" onclick="downloadAnalysisReportPDF()">📄 Download Analysis Report (PDF)</button>
+  </div>
+</div>
+
+<!-- DOWNLOAD -->
+<div class="page" id="page_download">
+  <div class="card">
+    <div class="ct">⬇️ Month-wise Report</div>
+    <button class="btn btn-navy" onclick="downloadMonthCSV()">📊 Download This Month (CSV)</button>
+  </div>
+  <div class="card">
+    <div class="ct">🏷️ Tag-wise Full History</div>
+    <select id="tag_dl_select" style="margin-bottom:8px"></select>
+    <button class="btn btn-navy" onclick="downloadTagCSV()">📊 Download Full History for Tag (CSV)</button>
+  </div>
+  <div class="card">
+    <div class="ct">📧 Daily Summary Email</div>
+    <p class="mini" style="margin-bottom:8px">A consolidated summary is emailed to the HoD once per day, covering hours logged, review status, and any out-of-range readings. Generate a preview below for any date.</p>
+    <select id="summary_date_select" style="margin-bottom:8px"></select>
+    <button class="btn btn-navy" onclick="generateDailySummary()">📄 Generate & Preview Daily Summary</button>
+  </div>
+
+  <div class="card">
+    <div class="ct">📋 Audit Trail Export</div>
+    <button class="btn btn-outline" onclick="downloadAuditCSV()">📄 Export Full Audit Trail (CSV)</button>
+  </div>
+</div>
+
+<!-- REVIEW -->
+<div class="page" id="page_review">
+  <div class="card">
+    <div class="ct">⏳ Pending Reviews</div>
+    <div id="pending_list"></div>
+  </div>
+</div>
+
+<!-- AUDIT -->
+<div class="page" id="page_audit">
+  <div class="card">
+    <div class="ct">📋 Immutable Audit Trail</div>
+    <div id="audit_list"></div>
+  </div>
+</div>
+
+<!-- ADMIN -->
+<div class="page" id="page_admin">
+  <div class="as">
+    <div class="at">📥 Import Historical Data (CSV)</div>
+    <p class="mini" style="margin-bottom:8px">For backfilling old paper log data already typed into a spreadsheet. Download the template first so columns match exactly — imported rows skip QR/signature verification and are clearly marked "Imported" everywhere they appear.</p>
+    <button class="btn btn-outline" onclick="downloadCsvTemplate()">📄 Download CSV Template</button>
+    <label class="lbl">Choose CSV file</label>
+    <input type="file" id="import_csv_file" accept=".csv" style="margin-bottom:8px">
+    <button class="btn btn-navy" onclick="importCsvData()">📥 Import Selected File</button>
+    <div class="mini" id="import_status" style="margin-top:6px"></div>
+  </div>
+  <div class="as">
+    <div class="at">🎚️ Alert Ranges (Min / Max per Tag)</div>
+    <div id="admin_thresholds"></div>
+    <button class="btn btn-blue" onclick="saveThresholds()">💾 Save All Ranges</button>
+  </div>
+  <div class="as">
+    <div class="at">📧 Notification Recipients</div>
+    <label class="lbl">Shift Incharge notify email</label>
+    <input type="text" id="rec_incharge" value="rohitlokwani@dcmshriram.com">
+    <label class="lbl">HoD / Process Incharge email</label>
+    <input type="text" id="rec_hod" value="amitkumra@dcmshriram.com">
+    <button class="btn btn-blue" onclick="saveRecipients()">💾 Save Recipients</button>
+  </div>
+  <div class="as">
+    <div class="at">🔑 Password Reset</div>
+    <select id="reset_person" style="margin-bottom:8px"><option>Rohit</option></select>
+    <input type="text" id="reset_new_pass" placeholder="New password">
+    <button class="btn btn-blue" onclick="adminResetPass()">🔄 Reset Password</button>
+  </div>
+</div>
+
+</div>
+</div>
+
+<button class="incident-btn" id="incident_fab" style="display:none" onclick="openIncidentForm()" title="Report Incident">🚨</button>
+<div class="toast" id="toast"></div>
+
+<script>
+// ══════════════════════════════════════════════════════════════════
+// TAG DEFINITIONS — matching the real CCP Urea Plant paper log sheets
+// (Log Sheet 10: Lube Oil + Condensate Seal Flush | Log Sheet 17: C.C. Pump Field)
+// min/max are the actual printed operating bands. null means no bound on that side.
+// ══════════════════════════════════════════════════════════════════
+const SECTIONS = [
+  {id:"LUBE", label:"🛢️ Lube Oil System"},
+  {id:"SEAL_FLUSH", label:"💧 Condensate Seal Flush"},
+  {id:"CCP_FIELD", label:"⚙️ C.C. Pump (Field)"},
+];
+
+const TAGS = [
+  // LUBE OIL SYSTEM
+  {id:"AUX_AMPS", section:"LUBE", name:"Aux Oil Pump", unit:"Amps", min:0, max:4},
+  {id:"OIL_IN", section:"LUBE", name:"Oil Cooler Temp In (TI-4A)", unit:"°F", min:null, max:165},
+  {id:"OIL_OUT", section:"LUBE", name:"Oil Cooler Temp Out (TI-4B)", unit:"°F", min:null, max:125},
+  {id:"COMBINED_TEMP", section:"LUBE", name:"Combined Oil Temp (TI-5)", unit:"°F", min:null, max:160},
+  {id:"FILTER_OUT", section:"LUBE", name:"Oil Filter Pressure Out", unit:"PSI", min:18, max:null},
+  {id:"FILTER_DIFF", section:"LUBE", name:"Oil Filter Differential", unit:"PSI", min:null, max:20},
+  // CONDENSATE SEAL FLUSH SYSTEM
+  {id:"MOTOR1", section:"SEAL_FLUSH", name:"Seal Flush Pump Motor No.1", unit:"Amps", min:6, max:10},
+  {id:"MOTOR2", section:"SEAL_FLUSH", name:"Seal Flush Pump Motor No.2", unit:"Amps", min:6, max:10},
+  {id:"DISCHARGE_PRESS", section:"SEAL_FLUSH", name:"Discharge Pressure (PI-9)", unit:"Kg/cm²g", min:135, max:160},
+  {id:"DISCHARGE_TEMP", section:"SEAL_FLUSH", name:"Discharge Temp (TI)", unit:"°C", min:40, max:60},
+  {id:"BOOSTER_SEAL_PRESS", section:"SEAL_FLUSH", name:"Booster Seal Pressure (PI-11)", unit:"Kg/cm²g", min:20, max:30},
+  {id:"MAIN_7A", section:"SEAL_FLUSH", name:"Main Pump Pressure (PI-7A)", unit:"Kg/cm²g", min:25, max:40},
+  {id:"MAIN_7B", section:"SEAL_FLUSH", name:"Main Pump Pressure (PI-7B)", unit:"Kg/cm²g", min:60, max:80},
+  {id:"MAIN_8", section:"SEAL_FLUSH", name:"Main Pump Pressure (PI-8)", unit:"Kg/cm²g", min:120, max:140},
+  // C.C. PUMP (FIELD)
+  {id:"BP_MOTOR", section:"CCP_FIELD", name:"Booster Pump Motor", unit:"Amps", min:60, max:100},
+  {id:"BP_SUCTION", section:"CCP_FIELD", name:"Booster Pump Suction Pressure", unit:"Kg/cm²g", min:20, max:25},
+  {id:"BP_DISCHARGE", section:"CCP_FIELD", name:"Booster Pump Discharge Pressure", unit:"Kg/cm²g", min:26, max:40},
+  {id:"MP_MOTOR", section:"CCP_FIELD", name:"Main Pump Motor", unit:"Amps", min:120, max:155},
+  {id:"MP_FLOW", section:"CCP_FIELD", name:"Main Pump Flow", unit:"GPM", min:0, max:400},
+  {id:"MP_DISCHARGE", section:"CCP_FIELD", name:"Main Pump Discharge Pressure", unit:"Kg/cm²g", min:200, max:255},
+  {id:"GEARBOX_PRESS", section:"CCP_FIELD", name:"Booster Gear Box Oil Pressure", unit:"Kg/cm²", min:2.1, max:4.2},
+  {id:"GEARBOX_TEMP", section:"CCP_FIELD", name:"Booster Gear Box Oil Temp", unit:"°C", min:null, max:65},
+  {id:"OIL_FILTER_1", section:"CCP_FIELD", name:"Oil Filter In Line No.1", unit:"Kg/cm²", min:null, max:null},
+  {id:"OIL_FILTER_2", section:"CCP_FIELD", name:"Oil Filter In Line No.2", unit:"Kg/cm²", min:null, max:null},
+  {id:"SFCF_1", section:"CCP_FIELD", name:"Seal Flush Cond. Filter No.1 Out", unit:"Kg/cm²g", min:5, max:8},
+  {id:"SFCF_2", section:"CCP_FIELD", name:"Seal Flush Cond. Filter No.2 Out", unit:"Kg/cm²g", min:5, max:8},
+  {id:"SFCF_DIFF", section:"CCP_FIELD", name:"Seal Flush Cond. Filter Diff", unit:"Kg/cm²", min:null, max:1.0},
+  {id:"LEAK_BOOSTER", section:"CCP_FIELD", name:"Seal Leakage — Booster Pump", unit:"CC/MIN", min:null, max:650},
+  {id:"LEAK_MAIN_LP", section:"CCP_FIELD", name:"Seal Leakage — Main Pump (LP Side)", unit:"CC/MIN", min:null, max:650},
+  {id:"LEAK_MAIN_HP", section:"CCP_FIELD", name:"Seal Leakage — Main Pump (HP Side)", unit:"CC/MIN", min:null, max:650},
+];
+
+const HOURS = ["0700","0800","0900","1000","1100","1200","1300","1400","1500","1600","1700","1800","1900","2000","2100","2200","2300","0000","0100","0200","0300","0400","0500","0600"];
+
+function shiftForHour(h){
+  const n = parseInt(h);
+  if(n>=700 && n<1500) return "Morning";
+  if(n>=1500 && n<2300) return "Afternoon";
+  return "Night"; // 2300-0659
+}
+function rangeText(tag){
+  if(tag.min!=null && tag.max!=null) return tag.min+"–"+tag.max+" "+tag.unit;
+  if(tag.max!=null) return "≤"+tag.max+" "+tag.unit;
+  if(tag.min!=null) return "≥"+tag.min+" "+tag.unit;
+  return "log only ("+tag.unit+")";
+}
+function tagStatus(tag, val){
+  if(isNaN(val)) return null;
+  if(tag.min!=null && val<tag.min) return "low";
+  if(tag.max!=null && val>tag.max) return "high";
+  return "ok";
+}
+
+let settings = {
+  ranges: Object.fromEntries(TAGS.map(t=>[t.id,{min:t.min,max:t.max}])),
+  recipients: {incharge:"rohitlokwani@dcmshriram.com", hod:"amitkumra@dcmshriram.com"},
+};
+
+// Official shift-verification QR code value — must match the printed QR posted at the CCP unit.
+const EXPECTED_QR_CODE = "DCM-CCP-UREA-01";
+
+// Passwords stored as SHA-256 hashes only — plaintext never appears in this file.
+// Full server-side authentication (Supabase Auth) is planned for the production build.
+const DEFAULT_PASS_HASHES = {"Rohit":"ecd71870d1963316a97e3ac3408c9835ad8cf0f3c1bc703527c30265534f75ae"};
+let customPasswords = {}; // admin-set overrides for this session (stored hashed)
+const INCHARGE_PASS_HASH = "247f7e418d2357798df0625a520e7adaba5bffc1e83c9c460151cbf41b83c568";
+const ADMIN_PASS_HASH = "240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9";
+
+async function sha256(text){
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,"0")).join("");
+}
+
+let entries = [];       // one entry = one hour's readings: {id,date,hour,shift,operator,readings:{tagId:val},alertTags:[],qrScannedAt,signature,status,reviewedBy,reviewedAt,rejectComment,createdAt,remarks}
+let auditLog = [];
+let notifications = [];
+let entryIdSeq = 1000;
+let currentRole = null, currentUser = null;
+let qrScannedShifts = {};   // key `${date}_${shift}` -> true
+let signedShifts = {};      // key `${date}_${shift}` -> true
+let qrStream = null;
+let activeSecTab = "LUBE";
+let activeStatSecTab = "LUBE";
+
+function toDateStr(d){ return d.toISOString().slice(0,10); }
+function toast(msg,ms=2500){ const t=document.getElementById("toast"); t.textContent=msg; t.style.display="block"; clearTimeout(t._tm); t._tm=setTimeout(()=>t.style.display="none",ms); }
+function log_audit(actor,action,detail){ auditLog.unshift({ts:new Date().toISOString(),actor,action,detail}); }
+function notify(to,subject,body){ notifications.unshift({ts:new Date().toISOString(),to,subject,body}); }
+
+// Logbook starts empty — entries are created live by operators or via CSV historical import.
+log_audit("System","Logbook initialized","CCP Urea Plant digital logbook started.");
+
+// ══ LOGIN ══
+let loginRole = "operator";
+function setLoginRole(role,btn){
+  loginRole=role;
+  document.querySelectorAll(".role-tab").forEach(b=>b.classList.remove("active"));
+  btn.classList.add("active");
+  document.getElementById("operator_login").style.display = role==="operator"?"block":"none";
+  document.getElementById("incharge_login").style.display = role==="incharge"?"block":"none";
+  document.getElementById("admin_login").style.display = role==="admin"?"block":"none";
+  document.getElementById("login_err").textContent="";
+}
+async function doLogin(){
+  const err=document.getElementById("login_err"); err.textContent="";
+  if(loginRole==="operator"){
+    const name=document.getElementById("op_name").value, pass=document.getElementById("op_pass").value;
+    if(!name){err.textContent="Select your name";return;}
+    const enteredHash = await sha256(pass);
+    const correctHash = customPasswords[name]||DEFAULT_PASS_HASHES[name];
+    if(enteredHash!==correctHash){err.textContent="❌ Wrong password";return;}
+    currentRole="operator"; currentUser=name;
+  } else if(loginRole==="incharge"){
+    const enteredHash = await sha256(document.getElementById("inc_pass").value);
+    if(enteredHash!==INCHARGE_PASS_HASH){err.textContent="❌ Wrong password";return;}
+    currentRole="incharge"; currentUser="Shift Incharge (shared login)";
+  } else {
+    const enteredHash = await sha256(document.getElementById("adm_pass").value);
+    if(enteredHash!==ADMIN_PASS_HASH){err.textContent="❌ Wrong password";return;}
+    currentRole="admin"; currentUser="Admin";
+  }
+  log_audit(currentUser,"Login","Role: "+currentRole);
+  enterApp();
+}
+function doLogout(){ log_audit(currentUser,"Logout",""); currentRole=null; currentUser=null;
+  document.getElementById("main_app").style.display="none"; document.getElementById("login_screen").style.display="flex"; }
+
+function enterApp(){
+  document.getElementById("login_screen").style.display="none";
+  document.getElementById("main_app").style.display="block";
+  document.getElementById("who_line").textContent=currentUser;
+  const badge=document.getElementById("role_badge");
+  badge.textContent = currentRole==="operator"?"Operator":currentRole==="incharge"?"Shift Incharge":"Admin";
+  badge.className="r-badge badge-"+currentRole;
+  buildTabs();
+  document.getElementById("incident_fab").style.display="block";
+  initEntryDefaults();
+  switchTab(currentRole==="operator"?"entry":currentRole==="incharge"?"review":"admin");
+}
+function buildTabs(){
+  const all={
+    entry:{label:"📋 Entry",roles:["operator"]},
+    records:{label:"📁 Records",roles:["operator","incharge","admin"]},
+    analysis:{label:"📊 Analysis",roles:["operator","incharge","admin"]},
+    download:{label:"⬇️ Download",roles:["operator","incharge","admin"]},
+    review:{label:"⏳ Review",roles:["incharge"]},
+    audit:{label:"📋 Audit",roles:["incharge","admin"]},
+    admin:{label:"⚙️ Admin",roles:["admin"]},
+  };
+  const row=document.getElementById("tabs_row"); row.innerHTML="";
+  Object.entries(all).forEach(([key,cfg])=>{
+    if(!cfg.roles.includes(currentRole)) return;
+    const b=document.createElement("button"); b.className="tab"; b.textContent=cfg.label; b.id="tabbtn_"+key;
+    b.onclick=()=>switchTab(key); row.appendChild(b);
+  });
+}
+function switchTab(key){
+  document.querySelectorAll(".page").forEach(p=>p.classList.remove("active"));
+  document.querySelectorAll(".tab").forEach(t=>t.classList.remove("active"));
+  document.getElementById("page_"+key)?.classList.add("active");
+  document.getElementById("tabbtn_"+key)?.classList.add("active");
+  if(key==="records") renderRecords();
+  if(key==="analysis") renderAnalysis();
+  if(key==="download") renderDownloadTags();
+  if(key==="review") renderPendingReviews();
+  if(key==="audit") renderAudit();
+  if(key==="admin") renderAdmin();
+}
+
+function initEntryDefaults(){
+  const now=new Date();
+  document.getElementById("e_date").value = toDateStr(now);
+  const hourSel=document.getElementById("e_hour");
+  hourSel.innerHTML="";
+  HOURS.forEach(h=>hourSel.add(new Option(h.slice(0,2)+":"+h.slice(2)+" hrs",h)));
+  const curHourStr = String(now.getHours()).padStart(2,"0")+"00";
+  hourSel.value = HOURS.includes(curHourStr)?curHourStr:HOURS[0];
+  onEntryContextChange();
+}
+
+// ══ ENTRY FLOW ══
+function currentShiftKey(){
+  const date=document.getElementById("e_date").value, hour=document.getElementById("e_hour").value;
+  return {date, hour, shift:shiftForHour(hour), key: date+"_"+shiftForHour(hour)};
+}
+function onEntryContextChange(){
+  const {shift,key} = currentShiftKey();
+  document.getElementById("shift_indicator").textContent = "This hour falls in: "+shift+" shift";
+  const qrDone = !!qrScannedShifts[key];
+  const sigDone = !!signedShifts[key];
+  document.getElementById("qr_card").style.display = qrDone?"none":"block";
+  document.getElementById("sig_card").style.display = (qrDone && !sigDone)?"block":"none";
+  document.getElementById("entry_sections").style.display = (qrDone && sigDone)?"block":"none";
+  if(qrDone && sigDone) buildEntrySections();
+  // reset qr box visuals if re-shown for a new shift
+  if(!qrDone){
+    document.getElementById("qr_box").classList.remove("scanned");
+    document.getElementById("qr_status").textContent="Scan the QR code posted at the CCP unit to unlock this shift's entries.";
+    document.getElementById("qr_scan_btn").style.display="block";
+    document.getElementById("qr_demo_btn").style.display="none";
+  }
+}
+
+async function startQrScan(){
+  const video=document.getElementById("qr_video");
+  try{
+    qrStream = await navigator.mediaDevices.getUserMedia({video:{facingMode:"environment"}});
+    video.srcObject=qrStream; video.style.display="block"; video.play();
+    document.getElementById("qr_scan_btn").style.display="none";
+    document.getElementById("qr_status").textContent="Point camera at the QR code...";
+    scanQrLoop();
+  }catch(e){
+    document.getElementById("qr_status").textContent="⚠️ Camera access unavailable — please open the logbook via its official app link (https) in Chrome, or use manual verification below.";
+    document.getElementById("qr_demo_btn").style.display="block";
+  }
+}
+function scanQrLoop(){
+  const video=document.getElementById("qr_video"), canvas=document.getElementById("qr_canvas"), ctx=canvas.getContext("2d");
+  function tick(){
+    const {key}=currentShiftKey();
+    if(qrScannedShifts[key]) return;
+    if(video.readyState===video.HAVE_ENOUGH_DATA && window.jsQR){
+      canvas.width=video.videoWidth; canvas.height=video.videoHeight;
+      ctx.drawImage(video,0,0,canvas.width,canvas.height);
+      const img=ctx.getImageData(0,0,canvas.width,canvas.height);
+      const code=jsQR(img.data,img.width,img.height);
+      if(code){
+        if(code.data===EXPECTED_QR_CODE){ onQrSuccess(); return; }
+        // Wrong QR scanned — show feedback but keep scanning
+        const st=document.getElementById("qr_status");
+        if(st && !st._wrongShown){ st._wrongShown=true; st.textContent="❌ Wrong QR code — scan the official CCP Urea Plant code posted at the unit."; setTimeout(()=>{st._wrongShown=false;},3000); }
+      }
+    }
+    requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+}
+function simulateQrScan(){ onQrSuccess(true); }
+function onQrSuccess(simulated){
+  const {key}=currentShiftKey();
+  qrScannedShifts[key]=true;
+  if(qrStream){ qrStream.getTracks().forEach(t=>t.stop()); }
+  document.getElementById("qr_video").style.display="none";
+  document.getElementById("qr_box").classList.add("scanned");
+  document.getElementById("qr_status").textContent="✅ Verified"+(simulated?" (manual)":" (QR scan)")+" at "+new Date().toLocaleTimeString();
+  log_audit(currentUser,"QR scan (shift start)",key+(simulated?" [MANUAL VERIFICATION — camera unavailable]":""));
+  toast("✅ Shift verified — sign to unlock hourly entry");
+  setTimeout(()=>{ onEntryContextChange(); setupSig("sig_pad"); },50);
+}
+
+function initSigPad(){ setupSig("sig_pad"); }
+function setupSig(id){
+  const canvas=document.getElementById(id); if(!canvas||canvas._wired) return; canvas._wired=true;
+  const ratio=window.devicePixelRatio||1;
+  canvas.width=canvas.clientWidth*ratio; canvas.height=canvas.clientHeight*ratio;
+  const ctx=canvas.getContext("2d"); ctx.scale(ratio,ratio);
+  ctx.strokeStyle="#1a2340"; ctx.lineWidth=2; ctx.lineCap="round";
+  let drawing=false;
+  function pos(e){ const r=canvas.getBoundingClientRect(); const cx=(e.touches?e.touches[0].clientX:e.clientX)-r.left; const cy=(e.touches?e.touches[0].clientY:e.clientY)-r.top; return {x:cx,y:cy}; }
+  function start(e){ drawing=true; const p=pos(e); ctx.beginPath(); ctx.moveTo(p.x,p.y); e.preventDefault(); }
+  function move(e){ if(!drawing) return; const p=pos(e); ctx.lineTo(p.x,p.y); ctx.stroke(); e.preventDefault(); }
+  function end(){ drawing=false; }
+  canvas.addEventListener("mousedown",start); canvas.addEventListener("mousemove",move); canvas.addEventListener("mouseup",end);
+  canvas.addEventListener("touchstart",start); canvas.addEventListener("touchmove",move); canvas.addEventListener("touchend",end);
+}
+function clearSig(id){ const c=document.getElementById(id); c.getContext("2d").clearRect(0,0,c.width,c.height); }
+function sigHasContent(id){ const c=document.getElementById(id); const d=c.getContext("2d").getImageData(0,0,c.width,c.height).data; for(let i=3;i<d.length;i+=4){ if(d[i]!==0) return true; } return false; }
+
+// hook: confirm signature button — unlocks entry fields immediately for this shift
+function confirmShiftSignatureAndUnlock(){
+  const {key}=currentShiftKey();
+  if(!sigHasContent("sig_pad")){ toast("⚠️ Sign before continuing"); return; }
+  signedShifts[key]=true;
+  log_audit(currentUser,"Shift signature captured",key);
+  toast("✅ Shift verified — hourly entry unlocked");
+  onEntryContextChange();
+}
+
+function buildEntrySections(){
+  const {date,hour}=currentShiftKey();
+  const existing = entries.find(e=>e.date===date && e.hour===hour && e.operator===currentUser);
+  const secTabs=document.getElementById("sec_tabs"); secTabs.innerHTML="";
+  SECTIONS.forEach(s=>{
+    const b=document.createElement("button"); b.className="sec-tab"+(s.id===activeSecTab?" active":"");
+    b.textContent=s.label; b.onclick=()=>switchSecTab(s.id);
+    secTabs.appendChild(b);
+  });
+  const pagesWrap=document.getElementById("sec_pages"); pagesWrap.innerHTML="";
+  SECTIONS.forEach(s=>{
+    const div=document.createElement("div"); div.className="card sec-page"+(s.id===activeSecTab?" active":"");
+    div.id="secpage_"+s.id;
+    let html="";
+    TAGS.filter(t=>t.section===s.id).forEach(t=>{
+      const prevVal = existing?.readings?.[t.id];
+      html += `<div class="gauge-field" id="field_${t.id}">
+        <div class="gauge-name">${t.name} <span class="gauge-limit">${rangeText(t)}</span></div>
+        <input type="number" step="0.01" id="v_${t.id}" placeholder="Enter ${t.unit}" value="${prevVal!=null?prevVal:''}" oninput="checkFieldInput('${t.id}')">
+        <div class="mini" id="roc_${t.id}"></div>
+      </div>`;
+    });
+    div.innerHTML = html;
+    pagesWrap.appendChild(div);
+  });
+  // Run status check on prefilled values (editing an existing hour)
+  TAGS.forEach(t=>checkFieldInput(t.id));
+}
+
+function switchSecTab(id){
+  activeSecTab=id;
+  document.querySelectorAll("#sec_tabs .sec-tab").forEach(b=>b.classList.remove("active"));
+  document.querySelectorAll(".sec-page").forEach(p=>p.classList.remove("active"));
+  document.getElementById("secpage_"+id)?.classList.add("active");
+  SECTIONS.forEach((s,i)=>{ if(s.id===id) document.querySelectorAll("#sec_tabs .sec-tab")[i]?.classList.add("active"); });
+}
+
+function checkFieldInput(tagId){
+  const tag=TAGS.find(t=>t.id===tagId);
+  const inp=document.getElementById("v_"+tagId); if(!inp) return;
+  const val=parseFloat(inp.value);
+  const field=document.getElementById("field_"+tagId);
+  const status=tagStatus(tag,val);
+  field.classList.toggle("hot", status==="high"||status==="low");
+  // rate of change vs previous hour for same tag
+  const {date,hour}=currentShiftKey();
+  const hourIdx = HOURS.indexOf(hour);
+  const prevHour = hourIdx>0?HOURS[hourIdx-1]:null;
+  const prevEntry = prevHour ? entries.find(e=>e.date===date && e.hour===prevHour && e.readings[tagId]!==undefined) : null;
+  const roc=document.getElementById("roc_"+tagId);
+  if(prevEntry && !isNaN(val)){
+    const prevVal=prevEntry.readings[tagId];
+    const pct = Math.abs(val-prevVal)/Math.max(Math.abs(prevVal),0.01)*100;
+    roc.innerHTML = pct>40 ? `⚠️ Rate-of-change: ${pct.toFixed(0)}% vs previous hour (${prevVal})` : "";
+  } else { roc.textContent=""; }
+}
+
+function submitHourEntry(){
+  const {date,hour,shift,key}=currentShiftKey();
+  if(!qrScannedShifts[key]){ toast("⚠️ Scan QR to start this shift first"); return; }
+  if(!signedShifts[key]){ toast("⚠️ Confirm your shift signature first"); return; }
+  const readings={}; let missing=[];
+  TAGS.forEach(t=>{
+    const v=document.getElementById("v_"+t.id)?.value;
+    if(v===""||v===undefined){ missing.push(t.name); } else { readings[t.id]=parseFloat(v); }
+  });
+  if(missing.length){ toast(`⚠️ Fill all fields (${missing.length} missing) — check each section tab`); return; }
+
+  const alertTags = TAGS.filter(t=>{ const st=tagStatus(t,readings[t.id]); return st==="high"||st==="low"; }).map(t=>t.id);
+
+  // Replace existing entry for this date+hour+operator if re-submitting, else create new
+  const existingIdx = entries.findIndex(e=>e.date===date && e.hour===hour && e.operator===currentUser);
+  const entry = {
+    id: existingIdx>=0?entries[existingIdx].id:entryIdSeq++,
+    date, hour, shift, operator:currentUser, readings,
+    remarks: document.getElementById("e_rem").value,
+    alertTags, qrScannedAt: new Date().toISOString(),
+    signature: "(signed at shift start)",
+    status:"Pending Review", createdAt:new Date().toISOString(),
+  };
+  if(existingIdx>=0){ entries[existingIdx]=entry; } else { entries.unshift(entry); }
+  log_audit(currentUser,"Hourly entry submitted", `${date} ${hour} — `+(alertTags.length?("ALERT: "+alertTags.join(", ")):"normal"));
+
+  if(alertTags.length){
+    notify(settings.recipients.incharge,"🚨 Alert — CCP Urea Plant "+hour,"Alert on entry #"+entry.id+": "+alertTags.join(", "));
+    notify(settings.recipients.hod,"🚨 Alert — CCP Urea Plant "+hour,"Alert on entry #"+entry.id+": "+alertTags.join(", "));
+    toast("✅ Saved — 🚨 "+alertTags.length+" tag(s) out of range, all parties notified");
+  } else {
+    toast("✅ Hour logged successfully");
+  }
+  document.getElementById("e_rem").value="";
+  // advance to next hour automatically for convenience
+  const hourSel=document.getElementById("e_hour");
+  const idx=HOURS.indexOf(hour);
+  if(idx<HOURS.length-1){ hourSel.value=HOURS[idx+1]; onEntryContextChange(); }
+}
+
+// ══ INCIDENT ══
+function openIncidentForm(){
+  const desc=prompt("🚨 INCIDENT REPORT\n\nDescribe the incident:");
+  if(!desc) return;
+  log_audit(currentUser,"🚨 INCIDENT reported",desc);
+  notify(settings.recipients.hod,"🚨 INCIDENT — CCP Urea Plant",desc+" (reported by "+currentUser+")");
+  notify(settings.recipients.incharge,"🚨 INCIDENT — CCP Urea Plant",desc);
+  toast("🚨 Incident reported — HoD & Incharge notified immediately");
+}
+
+// ══ RECORDS ══
+function renderRecords(){
+  const wrap=document.getElementById("records_list");
+  if(!entries.length){ wrap.innerHTML='<div class="empty">No entries yet</div>'; return; }
+  wrap.innerHTML = entries.slice(0,60).map(e=>{
+    const badgeClass = e.status==="Reviewed"?"b-ok":e.status==="Pending Review"?"b-pending":"b-rejected";
+    const alertBadge = e.alertTags?.length ? `<span class="badge b-alert">🚨 ${e.alertTags.length}</span>`:"";
+    const importedBadge = e.imported ? `<span class="badge" style="background:#e2e3e5;color:#41464b">📥 Imported</span>`:"";
+    const rows = Object.entries(e.readings||{}).slice(0,6).map(([k,v])=>{
+      const t=TAGS.find(x=>x.id===k); const st=t?tagStatus(t,v):null;
+      return `<tr><td class="k">${t?t.name:k}</td><td class="v ${st==='high'||st==='low'?'hot':''}">${v} ${t?t.unit:''}</td></tr>`;
+    }).join("");
+    return `<div class="rc">
+      <div class="rh"><div><div class="rt">${e.date} · ${e.hour} hrs · ${e.shift}</div><div class="rs">By ${e.operator}</div></div>
+      <div style="text-align:right"><span class="badge ${badgeClass}">${e.status}</span> ${alertBadge} ${importedBadge}</div></div>
+      <table class="mt">${rows}</table>
+      <div class="mini">Showing 6 of ${Object.keys(e.readings||{}).length} tags — full detail in Download/Analysis</div>
+      ${e.reviewedBy?`<div class="mini">✅ Reviewed by ${e.reviewedBy}</div>`:""}
+      ${e.rejectComment?`<div class="mini" style="color:var(--alert)">❌ Rejected: ${e.rejectComment}</div>`:""}
+    </div>`;
+  }).join("");
+}
+
+// ══ REVIEW ══
+function renderPendingReviews(){
+  const wrap=document.getElementById("pending_list");
+  const pending=entries.filter(e=>e.status==="Pending Review");
+  if(!pending.length){ wrap.innerHTML='<div class="empty">No entries awaiting review 🎉</div>'; return; }
+  wrap.innerHTML=pending.map(e=>{
+    const rows=Object.entries(e.readings||{}).slice(0,6).map(([k,v])=>{
+      const t=TAGS.find(x=>x.id===k); const st=t?tagStatus(t,v):null;
+      return `<tr><td class="k">${t?t.name:k}</td><td class="v ${st==='high'||st==='low'?'hot':''}">${v} ${t?t.unit:''}</td></tr>`;
+    }).join("");
+    return `<div class="rc">
+      <div class="rh"><div><div class="rt">${e.date} · ${e.hour} hrs · ${e.shift}</div><div class="rs">By ${e.operator}</div></div>
+      ${e.alertTags?.length?`<span class="badge b-alert">🚨 ${e.alertTags.length}</span>`:""}</div>
+      <table class="mt">${rows}</table>
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <button class="btn btn-green" style="margin-bottom:0" onclick="reviewEntry(${e.id},'approve')">✅ Approve</button>
+        <button class="btn btn-red" style="margin-bottom:0" onclick="reviewEntry(${e.id},'reject')">❌ Reject</button>
+      </div>
+    </div>`;
+  }).join("");
+}
+function reviewEntry(id,action){
+  const entry=entries.find(e=>e.id===id);
+  const name=prompt("Enter your name to "+(action==="approve"?"approve":"reject")+" this entry:");
+  if(!name){ toast("Cancelled"); return; }
+  if(action==="reject"){
+    const comment=prompt("Reason for rejection:");
+    entry.status="Rejected"; entry.rejectComment=comment; entry.reviewedBy=name; entry.reviewedAt=new Date().toISOString();
+    log_audit(name,"Entry rejected","Entry #"+id+": "+comment);
+    toast("❌ Entry rejected");
+  } else {
+    entry.status="Reviewed"; entry.reviewedBy=name; entry.reviewedAt=new Date().toISOString();
+    log_audit(name,"Entry reviewed/approved","Entry #"+id+(entry.alertTags?.length?" [had alert]":""));
+    if(entry.alertTags?.length){ notify(settings.recipients.hod,"Entry reviewed — was an alert entry","Entry #"+id+" reviewed by "+name); }
+    toast("✅ Entry approved as "+name);
+  }
+  renderPendingReviews();
+}
+
+// ══ AUDIT ══
+function renderAudit(){
+  const wrap=document.getElementById("audit_list");
+  wrap.innerHTML=auditLog.slice(0,100).map(a=>`<div class="audit-row"><b>${new Date(a.ts).toLocaleString()}</b> — ${a.actor}: ${a.action}${a.detail?" — "+a.detail:""}</div>`).join("")||'<div class="empty">No audit entries yet</div>';
+}
+function downloadAuditCSV(){
+  const hdrs=["Timestamp","Actor","Action","Detail"];
+  const rows=auditLog.map(a=>[a.ts,a.actor,a.action,a.detail||""].map(v=>`"${String(v).replace(/"/g,'""')}"`).join(","));
+  triggerDownload([hdrs.join(","),...rows].join("\n"),"CCP_Audit_Trail.csv");
+}
+
+// ══ ANALYSIS: CURRENT STATUS CARDS ══
+let statDialInstances=[];
+let statMode = "latest"; // "latest" = latest hour value, "avg" = average of today's hourly readings
+
+function setStatMode(mode){
+  statMode = mode;
+  document.getElementById("statmode_latest").classList.toggle("active", mode==="latest");
+  document.getElementById("statmode_avg").classList.toggle("active", mode==="avg");
+  const rangeRow = document.getElementById("statavg_range");
+  rangeRow.style.display = mode==="avg" ? "grid" : "none";
+  if(mode==="avg"){
+    // default both dates to today on first open
+    if(!document.getElementById("statavg_from").value){
+      const today = toDateStr(new Date());
+      document.getElementById("statavg_from").value = today;
+      document.getElementById("statavg_to").value = today;
+    }
+  }
+  renderStatCards();
+}
+
+function onStatAvgRangeChange(){
+  const f=document.getElementById("statavg_from").value, t=document.getElementById("statavg_to").value;
+  if(!f||!t) return;
+  if(f>t){ toast("⚠️ 'From' date must be before 'To' date"); return; }
+  renderStatCards();
+}
+
+function computeStatValues(){
+  const vals={}, meta={};
+  if(statMode==="latest"){
+    entries.forEach(e=>{ Object.entries(e.readings||{}).forEach(([k,v])=>{ if(!(k in vals)) { vals[k]=v; meta[k]=e.date+" "+e.hour; } }); });
+  } else {
+    const fromStr = document.getElementById("statavg_from").value || toDateStr(new Date());
+    const toStr = document.getElementById("statavg_to").value || fromStr;
+    const rangeEntries = entries.filter(e=>e.date>=fromStr && e.date<=toStr);
+    TAGS.forEach(t=>{
+      const nums = rangeEntries.filter(e=>e.readings[t.id]!==undefined).map(e=>e.readings[t.id]);
+      if(nums.length){
+        vals[t.id] = +(nums.reduce((a,b)=>a+b,0)/nums.length).toFixed(2);
+        meta[t.id] = nums.length+" reading avg";
+      }
+    });
+  }
+  return {vals, meta};
+}
+
+function renderStatCards(){
+  const secTabs=document.getElementById("stat_sec_tabs"); secTabs.innerHTML="";
+  SECTIONS.forEach(s=>{
+    const b=document.createElement("button"); b.className="sec-tab"+(s.id===activeStatSecTab?" active":"");
+    b.textContent=s.label; b.onclick=()=>{ activeStatSecTab=s.id; renderStatCards(); };
+    secTabs.appendChild(b);
+  });
+  const wrap=document.getElementById("stat_cards");
+  const {vals:latest, meta} = computeStatValues();
+  const secTags = TAGS.filter(t=>t.section===activeStatSecTab);
+
+  statDialInstances.forEach(c=>c.destroy()); statDialInstances=[];
+  wrap.innerHTML = `<div class="stat-grid">`+secTags.map((t,i)=>{
+    const v=latest[t.id]; const st=v!=null?tagStatus(t,v):null;
+    const pillClass = st==="high"?"pill-high":st==="low"?"pill-low":"pill-ok";
+    const pillText = st==="high"?"HIGH":st==="low"?"LOW":"OK";
+    const hasRange = t.min!=null || t.max!=null;
+    const metaLine = v!=null && statMode==="avg" ? `<div class="mini" style="text-align:center">${meta[t.id]||""}</div>` : "";
+    return `<div class="stat-card">
+      <div class="stat-name">${t.name}</div>
+      ${hasRange ? `<canvas id="dial_${t.id}" width="120" height="72" style="display:block;margin:0 auto"></canvas>` : ""}
+      <div class="stat-val" style="text-align:center">${v!=null?v:"—"} <span style="font-size:10px;color:var(--muted)">${t.unit}</span></div>
+      ${metaLine}
+      <div class="stat-range" style="text-align:center">${rangeText(t)}</div>
+      <div style="text-align:center">${v!=null?`<span class="pill ${pillClass}">${pillText}</span>`:""}</div>
+    </div>`;
+  }).join("")+`</div>`;
+
+  // Draw gauge dials after DOM insertion
+  secTags.forEach(t=>{
+    if(t.min==null && t.max==null) return; // no dial for pure log-only tags
+    const canvas=document.getElementById("dial_"+t.id); if(!canvas) return;
+    const v=latest[t.id];
+    const visMin = 0;
+    const visMax = t.max!=null ? t.max*1.15 : (t.min!=null ? t.min*1.6 : 10);
+    let pct = 0, color = "#c7ccd6";
+    if(v!=null){
+      pct = Math.max(0, Math.min(100, ((v-visMin)/(visMax-visMin))*100));
+      const st = tagStatus(t,v);
+      color = (st==="high"||st==="low") ? "#e63946" : "#2d6a4f";
+    }
+    const ctx=canvas.getContext("2d");
+    const c = new Chart(ctx,{type:"doughnut",
+      data:{datasets:[{data:[pct,100-pct],backgroundColor:[color,"#eef0f7"],borderWidth:0}]},
+      options:{circumference:180,rotation:270,cutout:"70%",plugins:{legend:{display:false},tooltip:{enabled:false}},responsive:false}});
+    statDialInstances.push(c);
+  });
+}
+
+// ══ MULTI-TAG BAR COMPARISON ══
+let barChartInstance=null;
+let selectedBarTags=["BP_SUCTION","BP_DISCHARGE"];
+function renderBarTagSelector(){
+  const wrap=document.getElementById("bar_tag_select"); wrap.innerHTML="";
+  TAGS.forEach(t=>{
+    const active=selectedBarTags.includes(t.id);
+    const chip=document.createElement("span"); chip.className="chip"; chip.style.opacity=active?1:0.4;
+    chip.textContent=(active?"✓ ":"")+t.name;
+    chip.onclick=()=>{
+      if(active){ selectedBarTags=selectedBarTags.filter(id=>id!==t.id); }
+      else { if(selectedBarTags.length>=6){ toast("⚠️ Max 6 tags"); return; } selectedBarTags.push(t.id); }
+      renderBarTagSelector(); renderBarChart();
+    };
+    wrap.appendChild(chip);
+  });
+}
+function setBarPreset(days){ const to=new Date(); const from=new Date(); from.setDate(from.getDate()-(days-1));
+  document.getElementById("bar_from").value=toDateStr(from); document.getElementById("bar_to").value=toDateStr(to); renderBarChart(); }
+function onBarRangeChange(){ const f=document.getElementById("bar_from").value,t=document.getElementById("bar_to").value; if(!f||!t)return; if(f>t){toast("⚠️ 'From' must be before 'To'");return;} renderBarChart(); }
+function initBarControls(){ if(!document.getElementById("bar_from").value) setBarPreset(7); }
+function renderBarChart(){
+  initBarControls();
+  if(!selectedBarTags.length){ if(barChartInstance){barChartInstance.destroy();barChartInstance=null;} document.getElementById("bar_range_note").textContent="Select at least one tag."; return; }
+  const shiftFilter=document.getElementById("bar_shift_filter").value;
+  const fromStr=document.getElementById("bar_from").value, toStr=document.getElementById("bar_to").value;
+  const from=new Date(fromStr), to=new Date(toStr);
+  const dayCount=Math.max(1,Math.round((to-from)/86400000)+1);
+  const labels=[]; for(let i=0;i<dayCount;i++){ const d=new Date(from); d.setDate(d.getDate()+i); labels.push(toDateStr(d)); }
+  const colors=["#1565c0","#f4a261","#2d6a4f","#9c27b0","#e63946","#00838f"];
+  const datasets=selectedBarTags.map((tid,i)=>{
+    const t=TAGS.find(x=>x.id===tid);
+    const data=labels.map(date=>{
+      let dayE=entries.filter(e=>e.readings[tid]!==undefined&&e.date===date);
+      if(shiftFilter!=="All") dayE=dayE.filter(e=>e.shift===shiftFilter);
+      if(!dayE.length) return null;
+      return +(dayE.reduce((a,e)=>a+e.readings[tid],0)/dayE.length).toFixed(2);
+    });
+    return {label:t.name+" ("+t.unit+")", data, backgroundColor:colors[i%colors.length]};
+  });
+  const pxPerDay=46; const wrapEl=document.getElementById("bar_scroll_wrap"); const minW=wrapEl.clientWidth||300;
+  const neededW=Math.max(minW,dayCount*pxPerDay);
+  document.getElementById("bar_canvas_holder").style.width=neededW+"px";
+  if(barChartInstance) barChartInstance.destroy();
+  const canvas=document.getElementById("bar_chart"); canvas.width=neededW;
+  barChartInstance=new Chart(canvas.getContext("2d"),{type:"bar",data:{labels,datasets},
+    options:{responsive:false,maintainAspectRatio:false,plugins:{legend:{position:"bottom",labels:{font:{size:9}}}},scales:{x:{ticks:{maxRotation:60,minRotation:60,font:{size:9}}}}}});
+  const shiftLabel=shiftFilter==="All"?"all shifts averaged":shiftFilter+" only";
+  document.getElementById("bar_range_note").textContent=`Showing ${dayCount} day(s) from ${fromStr} to ${toStr} · ${shiftLabel}`+(dayCount>10?" — scroll sideways →":"");
+}
+
+// ══ TREND ══
+let trendChartInstance=null;
+let selectedTrendTags=["OIL_IN","OIL_OUT","COMBINED_TEMP"];
+function renderTrendSelector(){
+  const wrap=document.getElementById("trend_select"); wrap.innerHTML="";
+  TAGS.forEach(t=>{
+    const active=selectedTrendTags.includes(t.id);
+    const chip=document.createElement("span"); chip.className="chip"; chip.style.opacity=active?1:0.4;
+    chip.textContent=(active?"✓ ":"")+t.name;
+    chip.onclick=()=>{
+      if(active){ selectedTrendTags=selectedTrendTags.filter(id=>id!==t.id); }
+      else { if(selectedTrendTags.length>=6){ toast("⚠️ Max 6 tags"); return; } selectedTrendTags.push(t.id); }
+      renderTrendSelector(); renderTrendChart();
+    };
+    wrap.appendChild(chip);
+  });
+}
+function setTrendPreset(days){ const to=new Date(); const from=new Date(); from.setDate(from.getDate()-(days-1));
+  document.getElementById("trend_from").value=toDateStr(from); document.getElementById("trend_to").value=toDateStr(to); renderTrendChart(); }
+function onTrendRangeChange(){ const f=document.getElementById("trend_from").value,t=document.getElementById("trend_to").value; if(!f||!t)return; if(f>t){toast("⚠️ 'From' must be before 'To'");return;} renderTrendChart(); }
+function renderTrendChart(){
+  if(!document.getElementById("trend_from").value){ setTrendPreset(7); return; }
+  const fromStr=document.getElementById("trend_from").value, toStr=document.getElementById("trend_to").value;
+  const from=new Date(fromStr), to=new Date(toStr);
+  const dayCount=Math.max(1,Math.round((to-from)/86400000)+1);
+  // hourly granularity: build label per (date,hour) combination present in range, sorted
+  const rangeEntries = entries.filter(e=>e.date>=fromStr&&e.date<=toStr).sort((a,b)=>(a.date+a.hour).localeCompare(b.date+b.hour));
+  const labels = [...new Set(rangeEntries.map(e=>e.date+" "+e.hour))];
+  const colors=["#1565c0","#f4a261","#2d6a4f","#9c27b0","#e63946","#00838f"];
+  const datasets=selectedTrendTags.map((tid,i)=>{
+    const t=TAGS.find(x=>x.id===tid);
+    const data=labels.map(lbl=>{
+      const match=rangeEntries.find(e=>(e.date+" "+e.hour)===lbl && e.readings[tid]!==undefined);
+      return match?match.readings[tid]:null;
+    });
+    return {label:t.name,data,borderColor:colors[i%colors.length],backgroundColor:"transparent",tension:.25,spanGaps:true,pointRadius:dayCount>15?1.5:dayCount>3?2:3,pointHoverRadius:5,borderWidth:2};
+  });
+  const pxPerPoint = dayCount<=1?60:dayCount<=7?18:8;
+  const wrapEl=document.getElementById("trend_scroll_wrap"); const minW=wrapEl.clientWidth||300;
+  const neededW=Math.max(minW, labels.length*pxPerPoint);
+  document.getElementById("trend_canvas_holder").style.width=neededW+"px";
+  if(trendChartInstance) trendChartInstance.destroy();
+  const canvas=document.getElementById("trend_chart"); canvas.width=neededW;
+  trendChartInstance=new Chart(canvas.getContext("2d"),{type:"line",data:{labels,datasets},
+    options:{responsive:false,maintainAspectRatio:false,plugins:{legend:{position:"bottom",labels:{font:{size:9}}}},scales:{x:{ticks:{maxRotation:70,minRotation:70,font:{size:8},autoSkip:true,maxTicksLimit:30}}}}});
+  document.getElementById("trend_range_note").textContent=`${labels.length} hourly point(s) from ${fromStr} to ${toStr}`+(neededW>minW?" — scroll sideways →":"");
+}
+
+// ══ MIN/MAX/AVG SUMMARY ══
+function setSummaryPreset(days){ const to=new Date(); const from=new Date(); from.setDate(from.getDate()-(days-1));
+  document.getElementById("summary_from").value=toDateStr(from); document.getElementById("summary_to").value=toDateStr(to); renderSummaryTable(); }
+function onSummaryRangeChange(){ const f=document.getElementById("summary_from").value,t=document.getElementById("summary_to").value; if(!f||!t)return; if(f>t){toast("⚠️ 'From' must be before 'To'");return;} renderSummaryTable(); }
+function renderSummaryTable(){
+  if(!document.getElementById("summary_from").value){ setSummaryPreset(7); return; }
+  const fromStr=document.getElementById("summary_from").value, toStr=document.getElementById("summary_to").value;
+  const rangeE=entries.filter(e=>e.date>=fromStr&&e.date<=toStr);
+  const table=document.getElementById("summary_table");
+  let html=`<tr><td class="k" style="font-weight:800">Tag</td><td class="k" style="font-weight:800">Min</td><td class="k" style="font-weight:800">Max</td><td class="k" style="font-weight:800">Avg</td><td class="k" style="font-weight:800">Band</td></tr>`;
+  TAGS.forEach(t=>{
+    const vals=rangeE.filter(e=>e.readings[t.id]!==undefined).map(e=>e.readings[t.id]);
+    if(!vals.length){ html+=`<tr><td class="k">${t.name}</td><td colspan="4" style="color:var(--muted)">No data</td></tr>`; return; }
+    const min=Math.min(...vals), max=Math.max(...vals), avg=vals.reduce((a,b)=>a+b,0)/vals.length;
+    const hot = tagStatus(t,max)==="high" || tagStatus(t,min)==="low";
+    html+=`<tr><td class="k">${t.name}</td><td>${min.toFixed(2)}</td><td class="${hot?'v hot':''}">${max.toFixed(2)}</td><td>${avg.toFixed(2)}</td><td style="color:var(--muted)">${rangeText(t)}</td></tr>`;
+  });
+  table.innerHTML=html;
+}
+
+// ══ CORRELATION ══
+let corrChartInstance=null;
+function initCorrSelects(){
+  const xs=document.getElementById("corr_x_select"), ys=document.getElementById("corr_y_select");
+  if(!xs.options.length){ TAGS.forEach(t=>{ xs.add(new Option(t.name,t.id)); ys.add(new Option(t.name,t.id)); }); xs.value="MP_MOTOR"; ys.value="MP_DISCHARGE"; }
+}
+function setCorrPreset(days){ const to=new Date(); const from=new Date(); from.setDate(from.getDate()-(days-1));
+  document.getElementById("corr_from").value=toDateStr(from); document.getElementById("corr_to").value=toDateStr(to); renderCorrelationChart(); }
+function onCorrRangeChange(){ const f=document.getElementById("corr_from").value,t=document.getElementById("corr_to").value; if(!f||!t)return; if(f>t){toast("⚠️ 'From' must be before 'To'");return;} renderCorrelationChart(); }
+function renderCorrelationChart(){
+  initCorrSelects();
+  if(!document.getElementById("corr_from").value){ setCorrPreset(15); return; }
+  const xId=document.getElementById("corr_x_select").value, yId=document.getElementById("corr_y_select").value;
+  const gx=TAGS.find(t=>t.id===xId), gy=TAGS.find(t=>t.id===yId);
+  const fromStr=document.getElementById("corr_from").value, toStr=document.getElementById("corr_to").value;
+  const points=entries.filter(e=>e.readings[xId]!==undefined&&e.readings[yId]!==undefined&&e.date>=fromStr&&e.date<=toStr)
+    .map(e=>({x:e.readings[xId],y:e.readings[yId]}));
+  if(corrChartInstance) corrChartInstance.destroy();
+  corrChartInstance=new Chart(document.getElementById("corr_chart").getContext("2d"),{type:"scatter",
+    data:{datasets:[{label:gx.name+" vs "+gy.name,data:points,backgroundColor:"#1565c0"}]},
+    options:{responsive:true,plugins:{legend:{display:false}},
+      scales:{x:{title:{display:true,text:gx.name+" ("+gx.unit+")",font:{size:10}}},y:{title:{display:true,text:gy.name+" ("+gy.unit+")",font:{size:10}}}}}});
+  let note=`${points.length} matching hourly entries from ${fromStr} to ${toStr}`;
+  if(points.length>=3){
+    const n=points.length, sx=points.reduce((a,p)=>a+p.x,0), sy=points.reduce((a,p)=>a+p.y,0);
+    const sxy=points.reduce((a,p)=>a+p.x*p.y,0), sx2=points.reduce((a,p)=>a+p.x*p.x,0), sy2=points.reduce((a,p)=>a+p.y*p.y,0);
+    const num=n*sxy-sx*sy, den=Math.sqrt((n*sx2-sx*sx)*(n*sy2-sy*sy));
+    const r=den!==0?num/den:0;
+    const strength=Math.abs(r)>=0.7?"strong":Math.abs(r)>=0.4?"moderate":Math.abs(r)>=0.15?"weak":"negligible";
+    const direction=Math.abs(r)<0.05?"":(r>=0?" positive":" negative");
+    note+=` · r=${r.toFixed(2)} (${strength}${direction} relationship)`;
+  }
+  document.getElementById("corr_range_note").textContent=note;
+}
+
+// ══ ALERT SUMMARY ══
+function renderAlertSummary(){
+  const wrap=document.getElementById("alert_summary");
+  const counts={};
+  entries.forEach(e=>(e.alertTags||[]).forEach(tid=>counts[tid]=(counts[tid]||0)+1));
+  const total=Object.values(counts).reduce((a,b)=>a+b,0);
+  if(!total){ wrap.innerHTML='<div class="empty">No out-of-range readings recorded ✅</div>'; return; }
+  wrap.innerHTML=Object.entries(counts).sort((a,b)=>b[1]-a[1]).map(([tid,c])=>{
+    const t=TAGS.find(x=>x.id===tid);
+    return `<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #f0f2f8">
+      <span style="font-size:12px">${t?t.name:tid}</span><span class="badge b-alert">${c} out-of-range</span></div>`;
+  }).join("");
+}
+
+function renderAnalysis(){
+  renderStatCards();
+  renderBarTagSelector();
+  renderBarChart();
+  renderTrendSelector();
+  renderTrendChart();
+  renderSummaryTable();
+  renderCorrelationChart();
+  renderAlertSummary();
+}
+
+// ══ DOWNLOAD ══
+function triggerDownload(text,filename){
+  const blob=new Blob(["\uFEFF"+text],{type:"text/csv;charset=utf-8"});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement("a"); a.href=url; a.download=filename; a.click();
+  URL.revokeObjectURL(url);
+}
+function downloadMonthCSV(){
+  const month=new Date().toISOString().slice(0,7);
+  const monthE=entries.filter(e=>e.date?.startsWith(month));
+  if(!monthE.length){ toast("No data for this month"); return; }
+  const hdrs=["Date","Hour","Shift","Operator",...TAGS.map(t=>t.name),"Status","Out-of-range tags"];
+  const rows=monthE.map(e=>[e.date,e.hour,e.shift,e.operator,...TAGS.map(t=>e.readings?.[t.id]??""),e.status,(e.alertTags||[]).join("; ")]
+    .map(v=>`"${String(v).replace(/"/g,'""')}"`).join(","));
+  triggerDownload([hdrs.join(","),...rows].join("\n"),"CCP_UreaPlant_"+month+".csv");
+  log_audit(currentUser,"Downloaded month CSV",month);
+}
+function renderDownloadTags(){
+  const sel=document.getElementById("tag_dl_select"); sel.innerHTML="";
+  TAGS.forEach(t=>sel.add(new Option(t.name,t.id)));
+  const dateSel=document.getElementById("summary_date_select");
+  if(dateSel && !dateSel.options.length){
+    const dates=[...new Set(entries.map(e=>e.date))].sort().reverse();
+    dates.forEach(d=>dateSel.add(new Option(d,d)));
+  }
+}
+function generateDailySummary(){
+  const date=document.getElementById("summary_date_select").value;
+  if(!date){ toast("⚠️ Pick a date"); return; }
+  const dayEntries=entries.filter(e=>e.date===date);
+  const hoursLogged=dayEntries.length;
+  const alertCount=dayEntries.reduce((a,e)=>a+(e.alertTags?.length||0),0);
+  const reviewedCount=dayEntries.filter(e=>e.status==="Reviewed").length;
+  const pendingCount=dayEntries.filter(e=>e.status==="Pending Review").length;
+  const missedHours = HOURS.length - hoursLogged;
+  const alertTagCounts={};
+  dayEntries.forEach(e=>(e.alertTags||[]).forEach(tid=>alertTagCounts[tid]=(alertTagCounts[tid]||0)+1));
+  const topAlerts = Object.entries(alertTagCounts).sort((a,b)=>b[1]-a[1]).slice(0,5)
+    .map(([tid,c])=>{ const t=TAGS.find(x=>x.id===tid); return `${t?t.name:tid}: ${c}x`; }).join(", ")||"none";
+
+  const body = `Daily Summary — CCP Urea Plant — ${date}\n\n`+
+    `Hours logged: ${hoursLogged} / ${HOURS.length} (${missedHours} missed)\n`+
+    `Reviewed: ${reviewedCount} · Pending review: ${pendingCount}\n`+
+    `Out-of-range readings: ${alertCount}\n`+
+    `Top alerting tags: ${topAlerts}`;
+
+  notify(settings.recipients.hod,"📄 Daily Summary — CCP Urea Plant "+date,body);
+  alert("Daily Summary Preview:\n\n"+body);
+  log_audit(currentUser,"Generated daily summary",date);
+}
+function downloadTagCSV(){
+  const tid=document.getElementById("tag_dl_select").value;
+  const t=TAGS.find(x=>x.id===tid);
+  const rows=entries.filter(e=>e.readings[tid]!==undefined)
+    .map(e=>[e.date,e.hour,e.shift,e.operator,e.readings[tid]].map(v=>`"${String(v).replace(/"/g,'""')}"`).join(","));
+  if(!rows.length){ toast("No history for this tag"); return; }
+  triggerDownload(["Date,Hour,Shift,Operator,"+t.name,...rows].join("\n"),"Tag_History_"+t.name.replace(/[^a-zA-Z0-9]+/g,"_")+".csv");
+  log_audit(currentUser,"Downloaded tag-wise history",t.name);
+}
+
+// ══ PDF EXPORT ══
+function addWrappedText(doc,text,x,y,maxWidth,lineHeight){ const lines=doc.splitTextToSize(text,maxWidth); doc.text(lines,x,y); return y+lines.length*lineHeight; }
+async function downloadAnalysisReportPDF(){
+  const btn=document.getElementById("analysis_pdf_btn"); const orig=btn.textContent;
+  btn.disabled=true; btn.textContent="⏳ Generating...";
+  try{
+    if(!window.jspdf){ toast("⚠️ PDF library not available"); return; }
+    const {jsPDF}=window.jspdf;
+    const doc=new jsPDF({unit:"pt",format:"a4"});
+    const pageW=doc.internal.pageSize.getWidth(), pageH=doc.internal.pageSize.getHeight(), margin=40;
+    let y=margin;
+    doc.setFontSize(16); doc.setFont(undefined,"bold");
+    doc.text("DCM Shriram — CCP Urea Plant Analysis Report",margin,y); y+=22;
+    doc.setFontSize(9); doc.setFont(undefined,"normal"); doc.setTextColor(110);
+    doc.text("Generated "+new Date().toLocaleString(),margin,y); y+=18;
+    doc.setTextColor(20); doc.setDrawColor(200); doc.line(margin,y,pageW-margin,y); y+=18;
+    function ensureSpace(h){ if(y+h>pageH-margin){ doc.addPage(); y=margin; } }
+    function addCanvasImage(id,label){
+      const canvas=document.getElementById(id); if(!canvas||canvas.width===0) return;
+      const imgData=canvas.toDataURL("image/png",0.92);
+      const imgW=pageW-margin*2, imgH=imgW*(canvas.height/canvas.width);
+      ensureSpace(Math.min(imgH,260)+30);
+      doc.setFontSize(11); doc.setFont(undefined,"bold"); doc.text(label,margin,y); y+=14;
+      doc.addImage(imgData,"PNG",margin,y,imgW,Math.min(imgH,260)); y+=Math.min(imgH,260)+18;
+    }
+    addCanvasImage("bar_chart","Multi-Tag Comparison — "+(document.getElementById("bar_range_note").textContent||""));
+    addCanvasImage("trend_chart","Trend — "+(document.getElementById("trend_range_note").textContent||""));
+    addCanvasImage("corr_chart","Correlation View — "+(document.getElementById("corr_range_note").textContent||""));
+    ensureSpace(30);
+    doc.setFontSize(11); doc.setFont(undefined,"bold"); doc.text("Min / Max / Avg Summary",margin,y); y+=16;
+    doc.setFontSize(8); doc.setFont(undefined,"normal");
+    document.querySelectorAll("#summary_table tr").forEach((tr,i)=>{
+      ensureSpace(13);
+      const cells=Array.from(tr.querySelectorAll("td")).map(td=>td.textContent.trim());
+      doc.setFont(undefined, i===0?"bold":"normal");
+      doc.text(cells.join("   |   "),margin,y); y+=13;
+    });
+    y+=10;
+    ensureSpace(30);
+    doc.setFontSize(11); doc.setFont(undefined,"bold"); doc.text("Alert Summary",margin,y); y+=16;
+    doc.setFontSize(9); doc.setFont(undefined,"normal");
+    const alertText=document.getElementById("alert_summary").innerText.trim()||"No out-of-range readings";
+    y=addWrappedText(doc,alertText,margin,y,pageW-margin*2,13);
+    doc.save("CCP_UreaPlant_Analysis_"+new Date().toISOString().slice(0,10)+".pdf");
+    log_audit(currentUser,"Downloaded analysis report PDF","");
+    toast("✅ Analysis report downloaded");
+  }catch(err){ console.error(err); toast("⚠️ Could not generate PDF"); }
+  finally{ btn.disabled=false; btn.textContent=orig; }
+}
+
+// ══ ADMIN ══
+// ══ CSV IMPORT (historical backfill) ══
+function csvHeaders(){
+  return ["Date","Hour","Shift","Operator",...TAGS.map(t=>t.name)];
+}
+function downloadCsvTemplate(){
+  const hdrs = csvHeaders();
+  const exampleRow = ["2026-07-01","0700","Morning","Rohit",...TAGS.map(t=>"")];
+  const csv = [hdrs.join(","), exampleRow.map(v=>`"${v}"`).join(",")].join("\n");
+  triggerDownload(csv,"CCP_Import_Template.csv");
+}
+function importCsvData(){
+  const fileInput = document.getElementById("import_csv_file");
+  const statusEl = document.getElementById("import_status");
+  if(!fileInput.files.length){ toast("⚠️ Choose a CSV file first"); return; }
+  if(!window.Papa){ toast("⚠️ CSV parser not available"); return; }
+  const file = fileInput.files[0];
+  statusEl.textContent = "⏳ Parsing...";
+  Papa.parse(file, {
+    header: true,
+    skipEmptyLines: true,
+    dynamicTyping: false,
+    complete: function(results){
+      let imported=0, skipped=0, skipReasons=[];
+      const nameToTag = {}; TAGS.forEach(t=>nameToTag[t.name]=t);
+      results.data.forEach((row,i)=>{
+        const date = (row["Date"]||"").trim();
+        const hour = (row["Hour"]||"").trim().padStart(4,"0");
+        const operator = (row["Operator"]||"").trim();
+        if(!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)){ skipped++; skipReasons.push(`Row ${i+2}: invalid/missing date`); return; }
+        if(!HOURS.includes(hour)){ skipped++; skipReasons.push(`Row ${i+2}: invalid hour "${row["Hour"]}"`); return; }
+        if(!operator){ skipped++; skipReasons.push(`Row ${i+2}: missing operator name`); return; }
+        const readings={};
+        TAGS.forEach(t=>{
+          const raw = row[t.name];
+          if(raw!==undefined && raw!==null && String(raw).trim()!==""){
+            const v=parseFloat(raw);
+            if(!isNaN(v)) readings[t.id]=v;
+          }
+        });
+        if(!Object.keys(readings).length){ skipped++; skipReasons.push(`Row ${i+2}: no readable tag values`); return; }
+        const shift = shiftForHour(hour);
+        const alertTags = TAGS.filter(t=>readings[t.id]!==undefined && (tagStatus(t,readings[t.id])==="high"||tagStatus(t,readings[t.id])==="low")).map(t=>t.id);
+        const existingIdx = entries.findIndex(e=>e.date===date && e.hour===hour && e.operator===operator);
+        const entry = {
+          id: existingIdx>=0?entries[existingIdx].id:entryIdSeq++,
+          date, hour, shift, operator, readings,
+          remarks: (row["Remarks"]||"").trim(),
+          alertTags, qrScannedAt:null, signature:null,
+          status:"Reviewed", imported:true,
+          reviewedBy: currentUser, reviewedAt: new Date().toISOString(),
+          createdAt: new Date().toISOString(),
+        };
+        if(existingIdx>=0){ entries[existingIdx]=entry; } else { entries.unshift(entry); }
+        imported++;
+      });
+      statusEl.innerHTML = `✅ Imported ${imported} row(s).` + (skipped?` ⚠️ Skipped ${skipped} row(s).`:"");
+      if(skipReasons.length){
+        statusEl.innerHTML += `<br><span style="color:var(--alert)">${skipReasons.slice(0,5).join("<br>")}</span>` + (skipReasons.length>5?`<br>...and ${skipReasons.length-5} more`:"");
+      }
+      log_audit(currentUser,"Imported historical CSV",`${imported} row(s) imported, ${skipped} skipped`);
+      toast(`✅ Imported ${imported} historical row(s)`+(skipped?`, ${skipped} skipped`:""));
+      fileInput.value="";
+    },
+    error: function(err){
+      statusEl.textContent="⚠️ Could not parse file: "+err.message;
+    }
+  });
+}
+
+function renderAdmin(){
+  const wrap=document.getElementById("admin_thresholds"); wrap.innerHTML="";
+  SECTIONS.forEach(s=>{
+    const h=document.createElement("div"); h.style.cssText="font-size:10px;font-weight:800;color:var(--muted);margin:8px 0 4px;text-transform:uppercase";
+    h.textContent=s.label; wrap.appendChild(h);
+    TAGS.filter(t=>t.section===s.id).forEach(t=>{
+      const div=document.createElement("div"); div.className="row2"; div.style.marginBottom="8px";
+      div.innerHTML=`<div><label class="lbl">${t.name} Min</label><input type="number" step="0.01" id="min_${t.id}" value="${settings.ranges[t.id].min??''}" placeholder="none"></div>
+        <div><label class="lbl">${t.name} Max</label><input type="number" step="0.01" id="max_${t.id}" value="${settings.ranges[t.id].max??''}" placeholder="none"></div>`;
+      wrap.appendChild(div);
+    });
+  });
+  document.getElementById("rec_incharge").value=settings.recipients.incharge;
+  document.getElementById("rec_hod").value=settings.recipients.hod;
+}
+function saveThresholds(){
+  TAGS.forEach(t=>{
+    const minV=document.getElementById("min_"+t.id).value, maxV=document.getElementById("max_"+t.id).value;
+    settings.ranges[t.id].min = minV===""?null:parseFloat(minV);
+    settings.ranges[t.id].max = maxV===""?null:parseFloat(maxV);
+    t.min=settings.ranges[t.id].min; t.max=settings.ranges[t.id].max;
+  });
+  log_audit(currentUser,"Updated alert ranges","");
+  toast("✅ Ranges saved");
+}
+function saveRecipients(){
+  settings.recipients.incharge=document.getElementById("rec_incharge").value;
+  settings.recipients.hod=document.getElementById("rec_hod").value;
+  log_audit(currentUser,"Updated notification recipients","");
+  toast("✅ Recipients saved");
+}
+async function adminResetPass(){
+  const person=document.getElementById("reset_person").value;
+  const newPass=document.getElementById("reset_new_pass").value.trim();
+  if(!newPass||newPass.length<4){ toast("⚠️ Password too short"); return; }
+  customPasswords[person]=await sha256(newPass);
+  log_audit(currentUser,"Password reset","For "+person);
+  toast("✅ Password reset for "+person);
+  document.getElementById("reset_new_pass").value="";
+}
+</script>
+</body>
+</html>
