@@ -10338,9 +10338,9 @@ canvas.sigpad{width:100%;height:120px;border:1.5px solid var(--border);border-ra
       <div>
         <label class="lbl">Shift</label>
         <select id="e_shift_select">
-          <option value="Morning">Morning (0700–1459)</option>
-          <option value="Afternoon">Afternoon (1500–2259)</option>
-          <option value="Night">Night (2300–0659)</option>
+          <option value="A Shift">A Shift (0630–1430)</option>
+          <option value="B Shift">B Shift (1430–2230)</option>
+          <option value="C Shift">C Shift (2230–0630)</option>
         </select>
       </div>
       <div>
@@ -10399,7 +10399,13 @@ canvas.sigpad{width:100%;height:120px;border:1.5px solid var(--border);border-ra
 <!-- RECORDS -->
 <div class="page" id="page_records">
   <div class="card">
-    <div class="ct">📁 Hourly Entries</div>
+    <div class="ct">📁 Entries</div>
+    <div id="records_filter_tabs" style="display:flex;gap:6px;margin-bottom:10px;overflow-x:auto">
+      <button class="sec-tab active" id="rf_all" onclick="setRecordsFilter('all')">All</button>
+      <button class="sec-tab" id="rf_pending" onclick="setRecordsFilter('pending')">⏳ Pending</button>
+      <button class="sec-tab" id="rf_approved" onclick="setRecordsFilter('approved')">✅ Approved</button>
+      <button class="sec-tab" id="rf_rejected" onclick="setRecordsFilter('rejected')">❌ Rejected</button>
+    </div>
     <div id="records_list"></div>
   </div>
 </div>
@@ -10427,9 +10433,9 @@ canvas.sigpad{width:100%;height:120px;border:1.5px solid var(--border);border-ra
     <label class="lbl">Shift</label>
     <select id="bar_shift_filter" onchange="renderBarChart()" style="margin-bottom:8px">
       <option value="All">All Shifts (averaged)</option>
-      <option value="Morning">Morning only</option>
-      <option value="Afternoon">Afternoon only</option>
-      <option value="Night">Night only</option>
+      <option value="A Shift">A Shift only (0630–1430)</option>
+      <option value="B Shift">B Shift only (1430–2230)</option>
+      <option value="C Shift">C Shift only (2230–0630)</option>
     </select>
     <div class="row2" style="margin-bottom:8px">
       <div><label class="lbl">From</label><input type="date" id="bar_from" onchange="onBarRangeChange()"></div>
@@ -10540,6 +10546,14 @@ canvas.sigpad{width:100%;height:120px;border:1.5px solid var(--border);border-ra
   </div>
 </div>
 
+<!-- INCIDENTS -->
+<div class="page" id="page_incidents">
+  <div class="card">
+    <div class="ct">🚨 Incident Reports</div>
+    <div id="incidents_list"></div>
+  </div>
+</div>
+
 <!-- AUDIT -->
 <div class="page" id="page_audit">
   <div class="card">
@@ -10584,6 +10598,46 @@ canvas.sigpad{width:100%;height:120px;border:1.5px solid var(--border);border-ra
 </div>
 
 <button class="incident-btn" id="incident_fab" style="display:none" onclick="openIncidentForm()" title="Report Incident">🚨</button>
+
+<!-- APPROVE MODAL -->
+<div id="approve_modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9000;align-items:center;justify-content:center;padding:20px">
+  <div style="background:#fff;border-radius:16px;padding:20px;width:100%;max-width:340px">
+    <div style="font-size:14px;font-weight:700;color:var(--ok);margin-bottom:12px">✅ Approve Entry</div>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:12px">Enter your name to confirm approval. This entry will become visible to HoD.</p>
+    <input type="text" id="approve_name_inp" placeholder="Your name (e.g. Niranjan)" style="margin-bottom:12px">
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-outline" style="margin-bottom:0;flex:1" onclick="closeModal('approve_modal')">Cancel</button>
+      <button class="btn btn-green" style="margin-bottom:0;flex:1" onclick="confirmApprove()">✅ Confirm Approve</button>
+    </div>
+  </div>
+</div>
+
+<!-- REJECT MODAL -->
+<div id="reject_modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9000;align-items:center;justify-content:center;padding:20px">
+  <div style="background:#fff;border-radius:16px;padding:20px;width:100%;max-width:340px">
+    <div style="font-size:14px;font-weight:700;color:var(--alert);margin-bottom:12px">❌ Reject Entry</div>
+    <input type="text" id="reject_name_inp" placeholder="Your name" style="margin-bottom:8px">
+    <textarea id="reject_reason_inp" rows="3" placeholder="Reason for rejection (operator will see this)..." style="width:100%;padding:9px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;margin-bottom:12px"></textarea>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-outline" style="margin-bottom:0;flex:1" onclick="closeModal('reject_modal')">Cancel</button>
+      <button class="btn btn-red" style="margin-bottom:0;flex:1" onclick="confirmReject()">❌ Confirm Reject</button>
+    </div>
+  </div>
+</div>
+
+<!-- INCIDENT MODAL -->
+<div id="incident_modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9000;align-items:center;justify-content:center;padding:20px">
+  <div style="background:#fff;border-radius:16px;padding:20px;width:100%;max-width:340px">
+    <div style="font-size:14px;font-weight:700;color:var(--alert);margin-bottom:12px">🚨 Report Incident</div>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:8px">This will immediately notify Shift Incharge and HoD.</p>
+    <input type="text" id="incident_reporter_inp" placeholder="Your name" style="margin-bottom:8px">
+    <textarea id="incident_desc_inp" rows="4" placeholder="Describe the incident in detail..." style="width:100%;padding:9px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;margin-bottom:12px"></textarea>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-outline" style="margin-bottom:0;flex:1" onclick="closeModal('incident_modal')">Cancel</button>
+      <button class="btn btn-red" style="margin-bottom:0;flex:1" onclick="confirmIncident()">🚨 Report Now</button>
+    </div>
+  </div>
+</div>
 <div class="toast" id="toast"></div>
 
 <script>
@@ -10634,13 +10688,13 @@ const TAGS = [
   {id:"LEAK_MAIN_HP", section:"CCP_FIELD", name:"Seal Leakage — Main Pump (HP Side)", unit:"CC/MIN", min:null, max:650},
 ];
 
-const HOURS = ["0700","0800","0900","1000","1100","1200","1300","1400","1500","1600","1700","1800","1900","2000","2100","2200","2300","0000","0100","0200","0300","0400","0500","0600"];
+const HOURS = ["0630","0730","0830","0930","1030","1130","1230","1330","1430","1530","1630","1730","1830","1930","2030","2130","2230","2330","0030","0130","0230","0330","0430","0530"];
 
 function shiftForHour(h){
   const n = parseInt(h);
-  if(n>=700 && n<1500) return "Morning";
-  if(n>=1500 && n<2300) return "Afternoon";
-  return "Night"; // 2300-0659
+  if(n>=630 && n<1430) return "A Shift";
+  if(n>=1430 && n<2230) return "B Shift";
+  return "C Shift"; // 2230-0629
 }
 function rangeText(tag){
   if(tag.min!=null && tag.max!=null) return tag.min+"–"+tag.max+" "+tag.unit;
@@ -10679,8 +10733,13 @@ async function sha256(text){
 let entries = [];
 let auditLog = [];
 let notifications = [];
+let incidents = [];
 let entryIdSeq = 1000;
 let supabaseReady = false;
+let _pendingReviewId = null;
+
+function showModal(id){ const el=document.getElementById(id); el.style.display="flex"; }
+function closeModal(id){ document.getElementById(id).style.display="none"; }
 
 async function loadFromSupabase(){
   try{
@@ -10779,6 +10838,7 @@ function buildTabs(){
     analysis:{label:"📊 Analysis",roles:["operator","incharge","hod","admin"]},
     download:{label:"⬇️ Download",roles:["operator","incharge","hod","admin"]},
     review:{label:"⏳ Review",roles:["incharge"]},
+    incidents:{label:"🚨 Incidents",roles:["incharge","hod","admin"]},
     audit:{label:"📋 Audit",roles:["incharge","admin"]},
     admin:{label:"⚙️ Admin",roles:["admin"]},
   };
@@ -10794,10 +10854,15 @@ function switchTab(key){
   document.querySelectorAll(".tab").forEach(t=>t.classList.remove("active"));
   document.getElementById("page_"+key)?.classList.add("active");
   document.getElementById("tabbtn_"+key)?.classList.add("active");
-  if(key==="records") renderRecords();
+  if(key==="records"){
+    const filterTabs = document.getElementById("records_filter_tabs");
+    if(filterTabs) filterTabs.style.display = currentRole==="hod" ? "none" : "flex";
+    renderRecords();
+  }
   if(key==="analysis") renderAnalysis();
   if(key==="download") renderDownloadTags();
   if(key==="review") renderPendingReviews();
+  if(key==="incidents") renderIncidents();
   if(key==="audit") renderAudit();
   if(key==="admin") renderAdmin();
 }
@@ -11082,22 +11147,53 @@ async function submitHourEntry(){
 
 // ══ INCIDENT ══
 function openIncidentForm(){
-  const desc=prompt("🚨 INCIDENT REPORT\n\nDescribe the incident:");
-  if(!desc) return;
-  log_audit(currentUser,"🚨 INCIDENT reported",desc);
-  notify(settings.recipients.hod,"🚨 INCIDENT — CCP Urea Plant",desc+" (reported by "+currentUser+")");
-  notify(settings.recipients.incharge,"🚨 INCIDENT — CCP Urea Plant",desc);
-  toast("🚨 Incident reported — HoD & Incharge notified immediately");
+  document.getElementById("incident_reporter_inp").value = currentUser && currentUser!=="Shift Incharge (shared login)"?currentUser:"";
+  document.getElementById("incident_desc_inp").value="";
+  showModal("incident_modal");
+}
+async function confirmIncident(){
+  const reporter = document.getElementById("incident_reporter_inp").value.trim();
+  const desc = document.getElementById("incident_desc_inp").value.trim();
+  if(!reporter){ toast("⚠️ Enter your name"); return; }
+  if(!desc){ toast("⚠️ Describe the incident"); return; }
+  closeModal("incident_modal");
+  const incident = {ts: new Date().toISOString(), reporter, description: desc};
+  incidents.unshift(incident);
+  await sb.from('audit_log').insert({actor:reporter, action:'🚨 INCIDENT REPORTED', detail:desc}).catch(()=>{});
+  log_audit(reporter,"🚨 INCIDENT REPORTED", desc);
+  notify(settings.recipients.incharge,"🚨 INCIDENT — CCP Urea Plant", desc+" (reported by "+reporter+")");
+  notify(settings.recipients.hod,"🚨 INCIDENT — CCP Urea Plant", desc+" (reported by "+reporter+")");
+  toast("🚨 Incident reported — Incharge and HoD notified");
 }
 
 // ══ RECORDS ══
+let recordsFilter = "all";
+function setRecordsFilter(f){
+  recordsFilter = f;
+  document.querySelectorAll("[id^='rf_']").forEach(b=>b.classList.remove("active"));
+  document.getElementById("rf_"+f)?.classList.add("active");
+  renderRecords();
+}
+
 function renderRecords(){
   const wrap=document.getElementById("records_list");
-  // HoD only sees reviewed/approved entries — not pending or rejected
-  const visible = currentRole==="hod"
-    ? entries.filter(e=>e.status==="Reviewed")
-    : entries;
-  if(!visible.length){ wrap.innerHTML='<div class="empty">No entries yet</div>'; return; }
+  let visible;
+  if(currentRole==="hod"){
+    visible = entries.filter(e=>e.status==="Reviewed");
+  } else if(currentRole==="operator"){
+    visible = entries.filter(e=>e.operator===currentUser);
+  } else {
+    visible = entries;
+  }
+  // Apply filter tabs
+  if(recordsFilter==="pending") visible = visible.filter(e=>e.status==="Pending Review");
+  else if(recordsFilter==="approved") visible = visible.filter(e=>e.status==="Reviewed");
+  else if(recordsFilter==="rejected") visible = visible.filter(e=>e.status==="Rejected");
+
+  if(!visible.length){
+    wrap.innerHTML=`<div class="empty">No ${recordsFilter==="all"?"":recordsFilter+" "}entries found</div>`;
+    return;
+  }
   wrap.innerHTML = visible.slice(0,60).map(e=>{
     const badgeClass = e.status==="Reviewed"?"b-ok":e.status==="Pending Review"?"b-pending":"b-rejected";
     const alertBadge = e.alertTags?.length ? `<span class="badge b-alert">🚨 ${e.alertTags.length}</span>`:"";
@@ -11193,32 +11289,79 @@ function renderPendingReviews(){
     </div>`;
   }).join('');
 }
-async function reviewEntry(id,action){
-  const entry=entries.find(e=>e.id===id);
-  const name=prompt("Enter your name to "+(action==="approve"?"approve":"reject")+" this entry:");
-  if(!name){ toast("Cancelled"); return; }
-  if(action==="reject"){
-    const comment=prompt("Reason for rejection (operator will be notified):");
-    if(!comment){ toast("Rejection reason required"); return; }
-    entry.status="Rejected"; entry.rejectComment=comment; entry.reviewedBy=name; entry.reviewedAt=new Date().toISOString();
-    await sb.from('hourly_entries').update({status:'Rejected',reviewed_by:name,reviewed_at:entry.reviewedAt,reject_comment:comment}).eq('id',id).catch(e=>console.error(e));
-    await sb.from('audit_log').insert({actor:name,action:'Entry rejected',detail:'Entry #'+id+': '+comment}).catch(()=>{});
-    log_audit(name,"Entry rejected","Entry #"+id+": "+comment);
-    notify(settings.recipients.incharge,"❌ Entry Rejected — CCP Urea Plant","Entry for "+entry.date+" "+entry.hour+" hrs by "+entry.operator+" was rejected by "+name+". Reason: "+comment);
-    toast("❌ Entry rejected — "+entry.operator+" will be notified");
+function reviewEntry(id, action){
+  _pendingReviewId = id;
+  if(action==="approve"){
+    document.getElementById("approve_name_inp").value="";
+    document.getElementById("approve_name_inp").placeholder="Enter Incharge name";
+    showModal("approve_modal");
   } else {
-    entry.status="Reviewed"; entry.reviewedBy=name; entry.reviewedAt=new Date().toISOString();
-    await sb.from('hourly_entries').update({status:'Reviewed',reviewed_by:name,reviewed_at:entry.reviewedAt}).eq('id',id).catch(e=>console.error(e));
-    await sb.from('audit_log').insert({actor:name,action:'Entry approved',detail:'Entry #'+id+' approved by '+name}).catch(()=>{});
-    log_audit(name,"Entry approved","Entry #"+id+" ("+entry.date+" "+entry.hour+") approved by "+name);
-    if(entry.alertTags?.length){
-      notify(settings.recipients.hod,"⚠️ Reviewed Alert Entry — CCP Urea Plant","Entry for "+entry.date+" "+entry.hour+" hrs had "+entry.alertTags.length+" out-of-range reading(s). Reviewed and approved by "+name+".");
-    } else {
-      notify(settings.recipients.hod,"✅ Entry Reviewed — CCP Urea Plant","Entry for "+entry.date+" "+entry.hour+" hrs by "+entry.operator+" approved by "+name+".");
-    }
-    toast("✅ Entry approved — HoD notified");
+    document.getElementById("reject_name_inp").value="";
+    document.getElementById("reject_reason_inp").value="";
+    showModal("reject_modal");
   }
+}
+async function confirmApprove(){
+  const name = document.getElementById("approve_name_inp").value.trim();
+  if(!name){ toast("⚠️ Enter your name"); return; }
+  closeModal("approve_modal");
+  const id = _pendingReviewId;
+  // Fix: compare as string and number both
+  const entry = entries.find(e=>String(e.id)===String(id));
+  if(!entry){ toast("Entry not found — please reload"); return; }
+  entry.status="Reviewed"; entry.reviewedBy=name; entry.reviewedAt=new Date().toISOString();
+  const {error} = await sb.from('hourly_entries').update({status:'Reviewed',reviewed_by:name,reviewed_at:entry.reviewedAt}).eq('id',id);
+  if(error){ showCloudError("Could not save approval: "+error.message); return; }
+  await sb.from('audit_log').insert({actor:name,action:'Entry approved',detail:'Entry #'+id+' approved by '+name}).catch(()=>{});
+  log_audit(name,"Entry approved","Entry #"+id+" approved by "+name);
+  if(entry.alertTags?.length){
+    notify(settings.recipients.hod,"⚠️ Reviewed Alert Entry — CCP Urea Plant","Entry for "+entry.date+" "+entry.hour+" hrs had "+entry.alertTags.length+" out-of-range reading(s). Reviewed and approved by "+name+".");
+  } else {
+    notify(settings.recipients.hod,"✅ Entry Reviewed — CCP Urea Plant","Entry for "+entry.date+" "+entry.hour+" hrs by "+entry.operator+" approved by "+name+".");
+  }
+  toast("✅ Entry approved — HoD notified");
+  await loadFromSupabase();
   renderPendingReviews();
+}
+async function confirmReject(){
+  const name = document.getElementById("reject_name_inp").value.trim();
+  const comment = document.getElementById("reject_reason_inp").value.trim();
+  if(!name){ toast("⚠️ Enter your name"); return; }
+  if(!comment){ toast("⚠️ Enter rejection reason"); return; }
+  closeModal("reject_modal");
+  const id = _pendingReviewId;
+  // Fix: compare as string and number both
+  const entry = entries.find(e=>String(e.id)===String(id));
+  if(!entry){ toast("Entry not found — please reload"); return; }
+  entry.status="Rejected"; entry.rejectComment=comment; entry.reviewedBy=name; entry.reviewedAt=new Date().toISOString();
+  const {error} = await sb.from('hourly_entries').update({status:'Rejected',reviewed_by:name,reviewed_at:entry.reviewedAt,reject_comment:comment}).eq('id',id);
+  if(error){ showCloudError("Could not save rejection: "+error.message); return; }
+  await sb.from('audit_log').insert({actor:name,action:'Entry rejected',detail:'Entry #'+id+': '+comment}).catch(()=>{});
+  log_audit(name,"Entry rejected","Entry #"+id+": "+comment);
+  notify(settings.recipients.incharge,"❌ Entry Rejected — CCP Urea Plant","Entry for "+entry.date+" "+entry.hour+" hrs by "+entry.operator+" rejected. Reason: "+comment);
+  toast("❌ Entry rejected");
+  await loadFromSupabase();
+  renderPendingReviews();
+}
+
+// ══ INCIDENTS ══
+function renderIncidents(){
+  const wrap=document.getElementById("incidents_list");
+  // Get incidents from audit log
+  const incidentLogs = auditLog.filter(a=>a.action.includes("INCIDENT"));
+  if(!incidentLogs.length){ wrap.innerHTML='<div class="empty">No incidents reported ✅</div>'; return; }
+  wrap.innerHTML = incidentLogs.map(a=>`
+    <div class="rc" style="border-left:3px solid var(--alert)">
+      <div class="rh">
+        <div>
+          <div class="rt" style="color:var(--alert)">🚨 Incident Report</div>
+          <div class="rs">${new Date(a.ts).toLocaleString()}</div>
+        </div>
+        <span class="badge b-alert">INCIDENT</span>
+      </div>
+      <div style="font-size:12px;margin-top:6px"><strong>Reported by:</strong> ${a.actor}</div>
+      <div style="font-size:12px;margin-top:4px;background:#fff5f5;padding:8px;border-radius:8px">${a.detail}</div>
+    </div>`).join("");
 }
 
 // ══ AUDIT ══
@@ -11624,7 +11767,7 @@ function csvHeaders(){
 }
 function downloadCsvTemplate(){
   const hdrs = csvHeaders();
-  const exampleRow = ["2026-07-01","0700","Morning","Rohit",...TAGS.map(t=>"")];
+  const exampleRow = ["2026-07-01","0630","A Shift","Rohit",...TAGS.map(t=>"")];
   const csv = [hdrs.join(","), exampleRow.map(v=>`"${v}"`).join(",")].join("\n");
   triggerDownload(csv,"CCP_Import_Template.csv");
 }
