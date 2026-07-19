@@ -10179,8 +10179,8 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#f0f4ff;color:#1a234
 .login-co{font-size:17px;font-weight:800;color:#fff;text-align:center}
 .login-dept{font-size:11px;color:rgba(255,255,255,.55);text-align:center;margin-bottom:14px}
 .login-card{background:#fff;border-radius:16px;padding:20px;width:100%;max-width:340px;box-shadow:0 8px 40px rgba(0,0,0,.3);margin-bottom:10px}
-.role-tabs{display:flex;gap:6px;margin-bottom:12px}
-.role-tab{flex:1;padding:8px 2px;border-radius:8px;border:1.5px solid rgba(255,255,255,.25);background:transparent;color:rgba(255,255,255,.7);font-size:11px;font-weight:700;cursor:pointer}
+.role-tabs{display:flex;gap:4px;margin-bottom:12px}
+.role-tab{flex:1;padding:8px 2px;border-radius:8px;border:1.5px solid rgba(255,255,255,.25);background:transparent;color:rgba(255,255,255,.7);font-size:10px;font-weight:700;cursor:pointer;line-height:1.4;text-align:center}
 .role-tab.active{background:var(--gold);color:#7c3a0a;border-color:var(--gold)}
 .login-title{font-size:14px;font-weight:700;color:var(--navy);margin-bottom:3px;text-align:center}
 .login-sub{font-size:10px;color:var(--muted);text-align:center;margin-bottom:12px}
@@ -10195,6 +10195,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#f0f4ff;color:#1a234
 .r-badge{font-size:10px;padding:2px 8px;border-radius:10px;font-weight:700}
 .badge-operator{background:#90caf9;color:#0d47a1}
 .badge-incharge{background:#c8e6c9;color:#1b5e20}
+.badge-hod{background:#ce93d8;color:#4a148c}
 .badge-admin{background:var(--gold);color:#7c3a0a}
 .tabs{display:flex;border-top:1px solid rgba(255,255,255,.15);overflow-x:auto}
 .tab{flex:1;min-width:60px;padding:9px 2px;font-size:9px;font-weight:500;color:rgba(255,255,255,.55);background:transparent;border:none;cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap}
@@ -10268,9 +10269,10 @@ canvas.sigpad{width:100%;height:120px;border:1.5px solid var(--border);border-ra
 
   <div class="login-card">
     <div class="role-tabs">
-      <button class="role-tab active" onclick="setLoginRole('operator',this)">👷 Operator</button>
-      <button class="role-tab" onclick="setLoginRole('incharge',this)">🧑‍✈️ Incharge</button>
-      <button class="role-tab" onclick="setLoginRole('admin',this)">👑 Admin</button>
+      <button class="role-tab active" onclick="setLoginRole('operator',this)">👷<br>Operator</button>
+      <button class="role-tab" onclick="setLoginRole('incharge',this)">🧑‍✈️<br>Incharge</button>
+      <button class="role-tab" onclick="setLoginRole('hod',this)">👔<br>HoD</button>
+      <button class="role-tab" onclick="setLoginRole('admin',this)">👑<br>Admin</button>
     </div>
     <div id="operator_login">
       <div class="login-title">Shift Operator Login</div>
@@ -10283,8 +10285,13 @@ canvas.sigpad{width:100%;height:120px;border:1.5px solid var(--border);border-ra
     </div>
     <div id="incharge_login" style="display:none">
       <div class="login-title">Shift Incharge Login</div>
-      <div class="login-sub">Shared login — you'll enter your name at review time</div>
+      <div class="login-sub">Shared login — enter your name at review time</div>
       <input class="login-inp" type="password" id="inc_pass" placeholder="Enter incharge password">
+    </div>
+    <div id="hod_login" style="display:none">
+      <div class="login-title">HoD / Process Incharge</div>
+      <div class="login-sub">View reviewed entries, analysis and reports</div>
+      <input class="login-inp" type="password" id="hod_pass" placeholder="Enter HoD password">
     </div>
     <div id="admin_login" style="display:none">
       <div class="login-title">Admin Login</div>
@@ -10324,7 +10331,28 @@ canvas.sigpad{width:100%;height:120px;border:1.5px solid var(--border);border-ra
       <div><label class="lbl">Date</label><input type="date" id="e_date" onchange="onEntryContextChange()"></div>
       <div><label class="lbl">Hour</label><select id="e_hour" onchange="onEntryContextChange()"></select></div>
     </div>
-    <div id="shift_indicator" style="font-size:11px;font-weight:700;color:var(--blue)"></div>
+    <div id="shift_indicator" style="font-size:11px;font-weight:700;color:var(--blue);margin-bottom:9px"></div>
+    <label class="lbl">Operator Name</label>
+    <input type="text" id="e_operator_name" placeholder="Enter your full name" style="margin-bottom:9px">
+    <div class="row2" style="margin-bottom:9px">
+      <div>
+        <label class="lbl">Shift</label>
+        <select id="e_shift_select">
+          <option value="Morning">Morning (0700–1459)</option>
+          <option value="Afternoon">Afternoon (1500–2259)</option>
+          <option value="Night">Night (2300–0659)</option>
+        </select>
+      </div>
+      <div>
+        <label class="lbl">Area / Unit</label>
+        <select id="e_area">
+          <option value="CCP Urea Plant">CCP Urea Plant</option>
+          <option value="CCP Field">CCP Field</option>
+          <option value="Lube Oil Room">Lube Oil Room</option>
+          <option value="Seal Flush Area">Seal Flush Area</option>
+        </select>
+      </div>
+    </div>
   </div>
 
   <div class="card" id="qr_card">
@@ -10337,6 +10365,13 @@ canvas.sigpad{width:100%;height:120px;border:1.5px solid var(--border);border-ra
       <button class="btn btn-blue" id="qr_scan_btn" onclick="startQrScan()">📷 Start Camera Scan</button>
       <button class="btn btn-outline" id="qr_switch_btn" onclick="switchQrCamera()" style="display:none">🔄 Switch Camera (front/back)</button>
       <button class="btn btn-outline" id="qr_demo_btn" onclick="simulateQrScan()" style="display:none">✔️ Manual Verification (camera unavailable)</button>
+      <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">
+        <div style="font-size:10px;color:var(--muted);margin-bottom:6px">On laptop or if camera can't read QR:</div>
+        <div style="display:flex;gap:6px">
+          <input type="password" id="manual_verify_pass" placeholder="Enter shift verification code" style="margin-bottom:0;flex:1;font-size:12px">
+          <button class="btn btn-outline" style="margin-bottom:0;padding:8px 12px;white-space:nowrap" onclick="manualVerify()">✔️ Verify</button>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -10633,6 +10668,7 @@ const EXPECTED_QR_CODE = "DCM-CCP-UREA-01";
 const DEFAULT_PASS_HASHES = {"Rohit":"ecd71870d1963316a97e3ac3408c9835ad8cf0f3c1bc703527c30265534f75ae"};
 let customPasswords = {}; // admin-set overrides for this session (stored hashed)
 const INCHARGE_PASS_HASH = "247f7e418d2357798df0625a520e7adaba5bffc1e83c9c460151cbf41b83c568";
+const HOD_PASS_HASH = "5c8473579466adb756fa9e042efc8d7756217c5f4c950731fcf96bd65ba184e9";
 const ADMIN_PASS_HASH = "240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9";
 
 async function sha256(text){
@@ -10691,6 +10727,7 @@ function setLoginRole(role,btn){
   btn.classList.add("active");
   document.getElementById("operator_login").style.display = role==="operator"?"block":"none";
   document.getElementById("incharge_login").style.display = role==="incharge"?"block":"none";
+  document.getElementById("hod_login").style.display = role==="hod"?"block":"none";
   document.getElementById("admin_login").style.display = role==="admin"?"block":"none";
   document.getElementById("login_err").textContent="";
 }
@@ -10707,6 +10744,10 @@ async function doLogin(){
     const enteredHash = await sha256(document.getElementById("inc_pass").value);
     if(enteredHash!==INCHARGE_PASS_HASH){err.textContent="❌ Wrong password";return;}
     currentRole="incharge"; currentUser="Shift Incharge (shared login)";
+  } else if(loginRole==="hod"){
+    const enteredHash = await sha256(document.getElementById("hod_pass").value);
+    if(enteredHash!==HOD_PASS_HASH){err.textContent="❌ Wrong password";return;}
+    currentRole="hod"; currentUser="HoD / Process Incharge";
   } else {
     const enteredHash = await sha256(document.getElementById("adm_pass").value);
     if(enteredHash!==ADMIN_PASS_HASH){err.textContent="❌ Wrong password";return;}
@@ -10724,19 +10765,19 @@ function enterApp(){
   loadFromSupabase();
   document.getElementById("who_line").textContent=currentUser;
   const badge=document.getElementById("role_badge");
-  badge.textContent = currentRole==="operator"?"Operator":currentRole==="incharge"?"Shift Incharge":"Admin";
+  badge.textContent = currentRole==="operator"?"Operator":currentRole==="incharge"?"Shift Incharge":currentRole==="hod"?"HoD":"Admin";
   badge.className="r-badge badge-"+currentRole;
   buildTabs();
   document.getElementById("incident_fab").style.display="block";
   initEntryDefaults();
-  switchTab(currentRole==="operator"?"entry":currentRole==="incharge"?"review":"admin");
+  switchTab(currentRole==="operator"?"entry":currentRole==="incharge"?"review":currentRole==="hod"?"records":"admin");
 }
 function buildTabs(){
   const all={
     entry:{label:"📋 Entry",roles:["operator"]},
-    records:{label:"📁 Records",roles:["operator","incharge","admin"]},
-    analysis:{label:"📊 Analysis",roles:["operator","incharge","admin"]},
-    download:{label:"⬇️ Download",roles:["operator","incharge","admin"]},
+    records:{label:"📁 Records",roles:["operator","incharge","hod","admin"]},
+    analysis:{label:"📊 Analysis",roles:["incharge","hod","admin"]},
+    download:{label:"⬇️ Download",roles:["incharge","hod","admin"]},
     review:{label:"⏳ Review",roles:["incharge"]},
     audit:{label:"📋 Audit",roles:["incharge","admin"]},
     admin:{label:"⚙️ Admin",roles:["admin"]},
@@ -10769,6 +10810,11 @@ function initEntryDefaults(){
   HOURS.forEach(h=>hourSel.add(new Option(h.slice(0,2)+":"+h.slice(2)+" hrs",h)));
   const curHourStr = String(now.getHours()).padStart(2,"0")+"00";
   hourSel.value = HOURS.includes(curHourStr)?curHourStr:HOURS[0];
+  // Pre-fill operator name from login
+  const nameField = document.getElementById("e_operator_name");
+  if(nameField && currentUser && currentUser!=="Shift Incharge (shared login)" && currentUser!=="Admin"){
+    nameField.value = currentUser;
+  }
   onEntryContextChange();
 }
 
@@ -10780,6 +10826,9 @@ function currentShiftKey(){
 function onEntryContextChange(){
   const {shift,key} = currentShiftKey();
   document.getElementById("shift_indicator").textContent = "This hour falls in: "+shift+" shift";
+  // Sync shift selector to match the detected shift
+  const shiftSel = document.getElementById("e_shift_select");
+  if(shiftSel) shiftSel.value = shift;
   const qrDone = !!qrScannedShifts[key];
   const sigDone = !!signedShifts[key];
   document.getElementById("qr_card").style.display = qrDone?"none":"block";
@@ -10860,6 +10909,19 @@ function scanQrLoop(){
     requestAnimationFrame(tick);
   }
   requestAnimationFrame(tick);
+}
+// Manual verification with password — for laptop use where camera can't scan QR poster
+const MANUAL_VERIFY_PASS = "DCM-CCP-UREA-01"; // same as the QR code value
+function manualVerify(){
+  const entered = document.getElementById("manual_verify_pass").value.trim();
+  if(!entered){ toast("⚠️ Enter the shift verification code"); return; }
+  if(entered !== MANUAL_VERIFY_PASS){
+    toast("❌ Wrong verification code — contact your Shift Incharge");
+    document.getElementById("manual_verify_pass").value="";
+    return;
+  }
+  document.getElementById("manual_verify_pass").value="";
+  onQrSuccess(true); // true = manual verification
 }
 function simulateQrScan(){ onQrSuccess(true); }
 function onQrSuccess(simulated){
@@ -10961,9 +11023,17 @@ function checkFieldInput(tagId){
 }
 
 async function submitHourEntry(){
-  const {date,hour,shift,key}=currentShiftKey();
+  const {date,hour,key}=currentShiftKey();
   if(!qrScannedShifts[key]){ toast("⚠️ Scan QR to start this shift first"); return; }
   if(!signedShifts[key]){ toast("⚠️ Confirm your shift signature first"); return; }
+
+  // Get operator name, shift and area from form
+  const operatorName = document.getElementById("e_operator_name")?.value.trim() || currentUser;
+  const shift = document.getElementById("e_shift_select")?.value || shiftForHour(hour);
+  const area = document.getElementById("e_area")?.value || "CCP Urea Plant";
+
+  if(!operatorName){ toast("⚠️ Enter your name before submitting"); return; }
+
   const readings={}; let missing=[];
   TAGS.forEach(t=>{
     const v=document.getElementById("v_"+t.id)?.value;
@@ -10974,10 +11044,10 @@ async function submitHourEntry(){
   const alertTags = TAGS.filter(t=>{ const st=tagStatus(t,readings[t.id]); return st==="high"||st==="low"; }).map(t=>t.id);
 
   // Replace existing entry for this date+hour+operator if re-submitting, else create new
-  const existingIdx = entries.findIndex(e=>e.date===date && e.hour===hour && e.operator===currentUser);
+  const existingIdx = entries.findIndex(e=>e.date===date && e.hour===hour && e.operator===operatorName);
   const entry = {
     id: existingIdx>=0?entries[existingIdx].id:entryIdSeq++,
-    date, hour, shift, operator:currentUser, readings,
+    date, hour, shift, operator:operatorName, area, readings,
     remarks: document.getElementById("e_rem").value,
     alertTags, qrScannedAt: new Date().toISOString(),
     signature: "(signed at shift start)",
@@ -10985,7 +11055,7 @@ async function submitHourEntry(){
   };
   // Save to Supabase
   try{
-    const {error}=await sb.from('hourly_entries').upsert({date,hour,shift,operator:currentUser,readings:entry.readings,alert_tags:alertTags,remarks:entry.remarks,status:'Pending Review',qr_scanned_at:entry.qrScannedAt,imported:false},{onConflict:'date,hour,operator'});
+    const {error}=await sb.from('hourly_entries').upsert({date,hour,shift,operator:operatorName,area:area,readings:entry.readings,alert_tags:alertTags,remarks:entry.remarks,status:'Pending Review',qr_scanned_at:entry.qrScannedAt,imported:false},{onConflict:'date,hour,operator'});
     if(error) throw error;
     hideCloudError();
   }catch(err){
@@ -11023,8 +11093,12 @@ function openIncidentForm(){
 // ══ RECORDS ══
 function renderRecords(){
   const wrap=document.getElementById("records_list");
-  if(!entries.length){ wrap.innerHTML='<div class="empty">No entries yet</div>'; return; }
-  wrap.innerHTML = entries.slice(0,60).map(e=>{
+  // HoD only sees reviewed/approved entries — not pending or rejected
+  const visible = currentRole==="hod"
+    ? entries.filter(e=>e.status==="Reviewed")
+    : entries;
+  if(!visible.length){ wrap.innerHTML='<div class="empty">No entries yet</div>'; return; }
+  wrap.innerHTML = visible.slice(0,60).map(e=>{
     const badgeClass = e.status==="Reviewed"?"b-ok":e.status==="Pending Review"?"b-pending":"b-rejected";
     const alertBadge = e.alertTags?.length ? `<span class="badge b-alert">🚨 ${e.alertTags.length}</span>`:"";
     const importedBadge = e.imported ? `<span class="badge" style="background:#e2e3e5;color:#41464b">📥 Imported</span>`:"";
@@ -11032,56 +11106,117 @@ function renderRecords(){
       const t=TAGS.find(x=>x.id===k); const st=t?tagStatus(t,v):null;
       return `<tr><td class="k">${t?t.name:k}</td><td class="v ${st==='high'||st==='low'?'hot':''}">${v} ${t?t.unit:''}</td></tr>`;
     }).join("");
+
+    // Rejection notice with resubmit button — only shown to the operator who submitted
+    const rejectionBlock = e.status==="Rejected" ? `
+      <div style="background:#fff5f5;border:1.5px solid var(--alert);border-radius:8px;padding:10px;margin-top:8px">
+        <div style="font-size:12px;font-weight:700;color:var(--alert);margin-bottom:4px">❌ Rejected by ${e.reviewedBy||'Incharge'}</div>
+        <div style="font-size:11px;color:var(--text);margin-bottom:8px">Reason: <strong>${e.rejectComment||'No reason given'}</strong></div>
+        ${currentRole==="operator"?`<button class="btn btn-blue" style="margin-bottom:0;padding:8px" onclick="resubmitEntry(${e.id})">🔄 Correct & Resubmit</button>`:''}
+      </div>` : "";
+
     return `<div class="rc">
       <div class="rh"><div><div class="rt">${e.date} · ${e.hour} hrs · ${e.shift}</div><div class="rs">By ${e.operator}</div></div>
       <div style="text-align:right"><span class="badge ${badgeClass}">${e.status}</span> ${alertBadge} ${importedBadge}</div></div>
       <table class="mt">${rows}</table>
       <div class="mini">Showing 6 of ${Object.keys(e.readings||{}).length} tags — full detail in Download/Analysis</div>
-      ${e.reviewedBy?`<div class="mini">✅ Reviewed by ${e.reviewedBy}</div>`:""}
-      ${e.rejectComment?`<div class="mini" style="color:var(--alert)">❌ Rejected: ${e.rejectComment}</div>`:""}
+      ${e.reviewedBy && e.status==="Reviewed"?`<div class="mini">✅ Reviewed by ${e.reviewedBy}</div>`:""}
+      ${rejectionBlock}
     </div>`;
   }).join("");
+}
+
+// ══ RESUBMIT REJECTED ENTRY ══
+function resubmitEntry(id){
+  const entry = entries.find(e=>e.id===id);
+  if(!entry){ toast("Entry not found"); return; }
+  // Switch to Entry tab, set the date/hour to match the rejected entry
+  switchTab('entry');
+  setTimeout(()=>{
+    document.getElementById('e_date').value = entry.date;
+    document.getElementById('e_hour').value = entry.hour;
+    onEntryContextChange();
+    toast("⚠️ Correct the readings and resubmit — rejected: "+entry.rejectComment);
+  }, 300);
 }
 
 // ══ REVIEW ══
 function renderPendingReviews(){
   const wrap=document.getElementById("pending_list");
-  const pending=entries.filter(e=>e.status==="Pending Review");
+  const pending=entries.filter(e=>e.status==="Pending Review").sort((a,b)=>a.date.localeCompare(b.date)||a.hour.localeCompare(b.hour));
   if(!pending.length){ wrap.innerHTML='<div class="empty">No entries awaiting review 🎉</div>'; return; }
   wrap.innerHTML=pending.map(e=>{
-    const rows=Object.entries(e.readings||{}).slice(0,6).map(([k,v])=>{
-      const t=TAGS.find(x=>x.id===k); const st=t?tagStatus(t,v):null;
-      return `<tr><td class="k">${t?t.name:k}</td><td class="v ${st==='high'||st==='low'?'hot':''}">${v} ${t?t.unit:''}</td></tr>`;
-    }).join("");
+    // Show ALL readings organized by section
+    const sectionHtml = SECTIONS.map(s=>{
+      const secTags = TAGS.filter(t=>t.section===s.id);
+      const rows = secTags.map(t=>{
+        const v = e.readings?.[t.id];
+        if(v===undefined||v===null) return '';
+        const st = tagStatus(t,v);
+        const hot = st==='high'||st==='low';
+        const statusBadge = hot ? `<span class="badge b-alert">${st==='high'?'HIGH':'LOW'}</span>` : '';
+        return `<tr>
+          <td class="k" style="font-size:10px">${t.name}</td>
+          <td class="v ${hot?'hot':''}" style="text-align:right;white-space:nowrap">${v} ${t.unit} ${statusBadge}</td>
+        </tr>`;
+      }).filter(r=>r).join('');
+      if(!rows) return '';
+      return `<div style="margin-bottom:6px">
+        <div style="font-size:9px;font-weight:800;color:var(--blue);text-transform:uppercase;padding:3px 0;border-bottom:1px solid var(--border);margin-bottom:4px">${s.label}</div>
+        <table class="mt">${rows}</table>
+      </div>`;
+    }).join('');
+
+    const alertSummary = e.alertTags?.length
+      ? `<div style="background:#fff5f5;border:1px solid var(--alert);border-radius:8px;padding:8px;margin-bottom:8px;font-size:11px;color:var(--alert);font-weight:700">
+          🚨 ${e.alertTags.length} reading(s) out of range: ${e.alertTags.map(tid=>{ const t=TAGS.find(x=>x.id===tid); return t?t.name:tid; }).join(', ')}
+         </div>` : '';
+
     return `<div class="rc">
-      <div class="rh"><div><div class="rt">${e.date} · ${e.hour} hrs · ${e.shift}</div><div class="rs">By ${e.operator}</div></div>
-      ${e.alertTags?.length?`<span class="badge b-alert">🚨 ${e.alertTags.length}</span>`:""}</div>
-      <table class="mt">${rows}</table>
-      <div style="display:flex;gap:8px;margin-top:8px">
-        <button class="btn btn-green" style="margin-bottom:0" onclick="reviewEntry(${e.id},'approve')">✅ Approve</button>
-        <button class="btn btn-red" style="margin-bottom:0" onclick="reviewEntry(${e.id},'reject')">❌ Reject</button>
+      <div class="rh">
+        <div>
+          <div class="rt">${e.date} · ${e.hour} hrs · ${e.shift} Shift</div>
+          <div class="rs">Submitted by: <strong>${e.operator}</strong> ${e.createdAt?'at '+new Date(e.createdAt).toLocaleTimeString():''}</div>
+        </div>
+        ${e.alertTags?.length?`<span class="badge b-alert">🚨 ${e.alertTags.length} alerts</span>`:'<span class="badge b-ok">✅ Normal</span>'}
+      </div>
+      ${e.remarks?`<div class="mini" style="margin-bottom:8px;padding:6px;background:#f8f9ff;border-radius:6px">📝 Remarks: ${e.remarks}</div>`:''}
+      ${alertSummary}
+      <details>
+        <summary style="font-size:11px;font-weight:700;color:var(--blue);cursor:pointer;padding:4px 0">📋 View all ${Object.keys(e.readings||{}).length} readings</summary>
+        <div style="margin-top:8px">${sectionHtml}</div>
+      </details>
+      <div style="display:flex;gap:8px;margin-top:10px">
+        <button class="btn btn-green" style="margin-bottom:0;flex:1" onclick="reviewEntry(${e.id},'approve')">✅ Approve</button>
+        <button class="btn btn-red" style="margin-bottom:0;flex:1" onclick="reviewEntry(${e.id},'reject')">❌ Reject</button>
       </div>
     </div>`;
-  }).join("");
+  }).join('');
 }
 async function reviewEntry(id,action){
   const entry=entries.find(e=>e.id===id);
   const name=prompt("Enter your name to "+(action==="approve"?"approve":"reject")+" this entry:");
   if(!name){ toast("Cancelled"); return; }
   if(action==="reject"){
-    const comment=prompt("Reason for rejection:");
+    const comment=prompt("Reason for rejection (operator will be notified):");
+    if(!comment){ toast("Rejection reason required"); return; }
     entry.status="Rejected"; entry.rejectComment=comment; entry.reviewedBy=name; entry.reviewedAt=new Date().toISOString();
     await sb.from('hourly_entries').update({status:'Rejected',reviewed_by:name,reviewed_at:entry.reviewedAt,reject_comment:comment}).eq('id',id).catch(e=>console.error(e));
     await sb.from('audit_log').insert({actor:name,action:'Entry rejected',detail:'Entry #'+id+': '+comment}).catch(()=>{});
     log_audit(name,"Entry rejected","Entry #"+id+": "+comment);
-    toast("❌ Entry rejected");
+    notify(settings.recipients.incharge,"❌ Entry Rejected — CCP Urea Plant","Entry for "+entry.date+" "+entry.hour+" hrs by "+entry.operator+" was rejected by "+name+". Reason: "+comment);
+    toast("❌ Entry rejected — "+entry.operator+" will be notified");
   } else {
     entry.status="Reviewed"; entry.reviewedBy=name; entry.reviewedAt=new Date().toISOString();
     await sb.from('hourly_entries').update({status:'Reviewed',reviewed_by:name,reviewed_at:entry.reviewedAt}).eq('id',id).catch(e=>console.error(e));
-    await sb.from('audit_log').insert({actor:name,action:'Entry reviewed/approved',detail:'Entry #'+id}).catch(()=>{});
-    log_audit(name,"Entry reviewed/approved","Entry #"+id+(entry.alertTags?.length?" [had alert]":""));
-    if(entry.alertTags?.length){ notify(settings.recipients.hod,"Entry reviewed — was an alert entry","Entry #"+id+" reviewed by "+name); }
-    toast("✅ Entry approved as "+name);
+    await sb.from('audit_log').insert({actor:name,action:'Entry approved',detail:'Entry #'+id+' approved by '+name}).catch(()=>{});
+    log_audit(name,"Entry approved","Entry #"+id+" ("+entry.date+" "+entry.hour+") approved by "+name);
+    if(entry.alertTags?.length){
+      notify(settings.recipients.hod,"⚠️ Reviewed Alert Entry — CCP Urea Plant","Entry for "+entry.date+" "+entry.hour+" hrs had "+entry.alertTags.length+" out-of-range reading(s). Reviewed and approved by "+name+".");
+    } else {
+      notify(settings.recipients.hod,"✅ Entry Reviewed — CCP Urea Plant","Entry for "+entry.date+" "+entry.hour+" hrs by "+entry.operator+" approved by "+name+".");
+    }
+    toast("✅ Entry approved — HoD notified");
   }
   renderPendingReviews();
 }
