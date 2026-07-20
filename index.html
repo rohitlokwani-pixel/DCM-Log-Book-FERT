@@ -10446,8 +10446,8 @@ canvas.sigpad{width:100%;height:120px;border:1.5px solid var(--border);border-ra
       <button class="btn btn-outline" style="margin-bottom:0;flex:1" onclick="setBarPreset(15)">Last 15d</button>
       <button class="btn btn-outline" style="margin-bottom:0;flex:1" onclick="setBarPreset(30)">Last 30d</button>
     </div>
-    <div style="overflow-x:auto;-webkit-overflow-scrolling:touch;border:1px solid var(--border);border-radius:8px;padding:6px 2px;touch-action:pan-x" id="bar_scroll_wrap">
-      <div id="bar_canvas_holder"><canvas id="bar_chart" height="180"></canvas></div>
+    <div style="overflow-x:auto;-webkit-overflow-scrolling:touch;border:1px solid var(--border);border-radius:8px;padding:6px 2px" id="bar_scroll_wrap">
+      <div id="bar_canvas_holder"><canvas id="bar_chart" height="180" style="touch-action:pan-x"></canvas></div>
     </div>
     <div class="mini" id="bar_range_note"></div>
   </div>
@@ -10465,8 +10465,8 @@ canvas.sigpad{width:100%;height:120px;border:1.5px solid var(--border);border-ra
       <button class="btn btn-outline" style="margin-bottom:0;flex:1" onclick="setTrendPreset(15)">Last 15d</button>
       <button class="btn btn-outline" style="margin-bottom:0;flex:1" onclick="setTrendPreset(30)">Last 30d</button>
     </div>
-    <div style="overflow-x:auto;-webkit-overflow-scrolling:touch;border:1px solid var(--border);border-radius:8px;padding:6px 2px;touch-action:pan-x" id="trend_scroll_wrap">
-      <div id="trend_canvas_holder"><canvas id="trend_chart" height="200"></canvas></div>
+    <div style="overflow-x:auto;-webkit-overflow-scrolling:touch;border:1px solid var(--border);border-radius:8px;padding:6px 2px" id="trend_scroll_wrap">
+      <div id="trend_canvas_holder"><canvas id="trend_chart" height="200" style="touch-action:pan-x"></canvas></div>
     </div>
     <div class="mini" id="trend_range_note"></div>
   </div>
@@ -11518,6 +11518,7 @@ function renderBarChart(){
   const canvas=document.getElementById("bar_chart"); canvas.width=neededW;
   barChartInstance=new Chart(canvas.getContext("2d"),{type:"bar",data:{labels,datasets},
     options:{responsive:false,maintainAspectRatio:false,plugins:{legend:{position:"bottom",labels:{font:{size:9}}}},scales:{x:{ticks:{maxRotation:60,minRotation:60,font:{size:9}}}}}});
+  canvas.style.touchAction = 'pan-x';
   const shiftLabel=shiftFilter==="All"?"all shifts averaged":shiftFilter+" only";
   document.getElementById("bar_range_note").textContent=`Showing ${dayCount} day(s) from ${fromStr} to ${toStr} · ${shiftLabel}`+(dayCount>10?" — scroll sideways →":"");
 }
@@ -11566,7 +11567,13 @@ function renderTrendChart(){
   if(trendChartInstance) trendChartInstance.destroy();
   const canvas=document.getElementById("trend_chart"); canvas.width=neededW;
   trendChartInstance=new Chart(canvas.getContext("2d"),{type:"line",data:{labels,datasets},
-    options:{responsive:false,maintainAspectRatio:false,plugins:{legend:{position:"bottom",labels:{font:{size:9}}}},scales:{x:{ticks:{maxRotation:70,minRotation:70,font:{size:8},autoSkip:true,maxTicksLimit:30}}}}});
+    options:{responsive:false,maintainAspectRatio:false,
+      plugins:{legend:{position:"bottom",labels:{font:{size:9}}}},
+      scales:{x:{ticks:{maxRotation:70,minRotation:70,font:{size:8},autoSkip:true,maxTicksLimit:30}}},
+      events:['mousemove','mouseout','click','touchstart','touchmove'],
+    }});
+  // Allow horizontal scroll through the canvas on mobile
+  canvas.style.touchAction = 'pan-x';
   document.getElementById("trend_range_note").textContent=`${labels.length} hourly point(s) from ${fromStr} to ${toStr}`+(neededW>minW?" — scroll sideways →":"");
 }
 
