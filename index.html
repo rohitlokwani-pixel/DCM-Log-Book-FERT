@@ -10446,7 +10446,7 @@ canvas.sigpad{width:100%;height:120px;border:1.5px solid var(--border);border-ra
       <button class="btn btn-outline" style="margin-bottom:0;flex:1" onclick="setBarPreset(15)">Last 15d</button>
       <button class="btn btn-outline" style="margin-bottom:0;flex:1" onclick="setBarPreset(30)">Last 30d</button>
     </div>
-    <div style="overflow-x:auto;border:1px solid var(--border);border-radius:8px;padding:6px 2px" id="bar_scroll_wrap">
+    <div style="overflow-x:auto;-webkit-overflow-scrolling:touch;border:1px solid var(--border);border-radius:8px;padding:6px 2px;touch-action:pan-x" id="bar_scroll_wrap">
       <div id="bar_canvas_holder"><canvas id="bar_chart" height="180"></canvas></div>
     </div>
     <div class="mini" id="bar_range_note"></div>
@@ -10465,7 +10465,7 @@ canvas.sigpad{width:100%;height:120px;border:1.5px solid var(--border);border-ra
       <button class="btn btn-outline" style="margin-bottom:0;flex:1" onclick="setTrendPreset(15)">Last 15d</button>
       <button class="btn btn-outline" style="margin-bottom:0;flex:1" onclick="setTrendPreset(30)">Last 30d</button>
     </div>
-    <div style="overflow-x:auto;border:1px solid var(--border);border-radius:8px;padding:6px 2px" id="trend_scroll_wrap">
+    <div style="overflow-x:auto;-webkit-overflow-scrolling:touch;border:1px solid var(--border);border-radius:8px;padding:6px 2px;touch-action:pan-x" id="trend_scroll_wrap">
       <div id="trend_canvas_holder"><canvas id="trend_chart" height="200"></canvas></div>
     </div>
     <div class="mini" id="trend_range_note"></div>
