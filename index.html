@@ -10333,7 +10333,7 @@ canvas.sigpad{width:100%;height:120px;border:1.5px solid var(--border);border-ra
     </div>
     <div id="shift_indicator" style="font-size:11px;font-weight:700;color:var(--blue);margin-bottom:9px"></div>
     <label class="lbl">Operator Name</label>
-    <input type="text" id="e_operator_name" placeholder="Enter your full name" style="margin-bottom:9px">
+    <input type="text" id="e_operator_name" placeholder="Operator name" style="margin-bottom:9px;background:#f0f4ff;color:var(--blue);font-weight:700" readonly>
     <div class="row2" style="margin-bottom:9px">
       <div>
         <label class="lbl">Shift</label>
@@ -10541,7 +10541,12 @@ canvas.sigpad{width:100%;height:120px;border:1.5px solid var(--border);border-ra
 <!-- REVIEW -->
 <div class="page" id="page_review">
   <div class="card">
-    <div class="ct">⏳ Pending Reviews</div>
+    <div class="ct">⏳ Review Entries</div>
+    <div style="display:flex;gap:6px;margin-bottom:10px">
+      <button class="sec-tab active" id="rv_pending" onclick="setReviewFilter('pending')">⏳ Pending</button>
+      <button class="sec-tab" id="rv_approved" onclick="setReviewFilter('approved')">✅ Approved</button>
+      <button class="sec-tab" id="rv_rejected" onclick="setReviewFilter('rejected')">❌ Rejected</button>
+    </div>
     <div id="pending_list"></div>
   </div>
 </div>
@@ -10861,7 +10866,7 @@ function switchTab(key){
   }
   if(key==="analysis") renderAnalysis();
   if(key==="download") renderDownloadTags();
-  if(key==="review") renderPendingReviews();
+  if(key==="review"){ reviewFilter="pending"; document.querySelectorAll("[id^='rv_']").forEach(b=>b.classList.remove("active")); document.getElementById("rv_pending")?.classList.add("active"); renderPendingReviews(); }
   if(key==="incidents") renderIncidents();
   if(key==="audit") renderAudit();
   if(key==="admin") renderAdmin();
@@ -11093,7 +11098,7 @@ async function submitHourEntry(){
   if(!signedShifts[key]){ toast("⚠️ Confirm your shift signature first"); return; }
 
   // Get operator name, shift and area from form
-  const operatorName = document.getElementById("e_operator_name")?.value.trim() || currentUser;
+  const operatorName = currentUser;
   const shift = document.getElementById("e_shift_select")?.value || shiftForHour(hour);
   const area = document.getElementById("e_area")?.value || "CCP Urea Plant";
 
@@ -11182,6 +11187,7 @@ function renderRecords(){
     visible = entries.filter(e=>e.status==="Reviewed");
   } else if(currentRole==="operator"){
     visible = entries.filter(e=>e.operator===currentUser);
+    if(!visible.length) visible = entries; // fallback if old entries have different name
   } else {
     visible = entries;
   }
@@ -11237,11 +11243,27 @@ function resubmitEntry(id){
 }
 
 // ══ REVIEW ══
+let reviewFilter = "pending";
+function setReviewFilter(f){
+  reviewFilter = f;
+  document.querySelectorAll("[id^='rv_']").forEach(b=>b.classList.remove("active"));
+  document.getElementById("rv_"+f)?.classList.add("active");
+  renderPendingReviews();
+}
+
 function renderPendingReviews(){
   const wrap=document.getElementById("pending_list");
-  const pending=entries.filter(e=>e.status==="Pending Review").sort((a,b)=>a.date.localeCompare(b.date)||a.hour.localeCompare(b.hour));
-  if(!pending.length){ wrap.innerHTML='<div class="empty">No entries awaiting review 🎉</div>'; return; }
-  wrap.innerHTML=pending.map(e=>{
+  let filtered;
+  if(reviewFilter==="pending") filtered = entries.filter(e=>e.status==="Pending Review");
+  else if(reviewFilter==="approved") filtered = entries.filter(e=>e.status==="Reviewed");
+  else filtered = entries.filter(e=>e.status==="Rejected");
+  filtered = filtered.sort((a,b)=>a.date.localeCompare(b.date)||a.hour.localeCompare(b.hour));
+  if(!filtered.length){ 
+    const msgs = {pending:"No entries awaiting review 🎉", approved:"No approved entries yet", rejected:"No rejected entries"};
+    wrap.innerHTML=`<div class="empty">${msgs[reviewFilter]}</div>`; 
+    return; 
+  }
+  wrap.innerHTML=filtered.map(e=>{
     // Show ALL readings organized by section
     const sectionHtml = SECTIONS.map(s=>{
       const secTags = TAGS.filter(t=>t.section===s.id);
@@ -11282,10 +11304,17 @@ function renderPendingReviews(){
         <summary style="font-size:11px;font-weight:700;color:var(--blue);cursor:pointer;padding:4px 0">📋 View all ${Object.keys(e.readings||{}).length} readings</summary>
         <div style="margin-top:8px">${sectionHtml}</div>
       </details>
+      ${reviewFilter==="pending" ? `
       <div style="display:flex;gap:8px;margin-top:10px">
         <button class="btn btn-green" style="margin-bottom:0;flex:1" onclick="reviewEntry(${e.id},'approve')">✅ Approve</button>
         <button class="btn btn-red" style="margin-bottom:0;flex:1" onclick="reviewEntry(${e.id},'reject')">❌ Reject</button>
-      </div>
+      </div>` : reviewFilter==="approved" ? `
+      <div style="background:#f0fff4;border:1px solid var(--ok);border-radius:8px;padding:8px;margin-top:8px;font-size:11px;color:var(--ok)">
+        ✅ Approved by <strong>${e.reviewedBy||'Incharge'}</strong> on ${e.reviewedAt?new Date(e.reviewedAt).toLocaleString():''}
+      </div>` : `
+      <div style="background:#fff5f5;border:1px solid var(--alert);border-radius:8px;padding:8px;margin-top:8px;font-size:11px;color:var(--alert)">
+        ❌ Rejected by <strong>${e.reviewedBy||'Incharge'}</strong> — Reason: ${e.rejectComment||'No reason given'}
+      </div>`}
     </div>`;
   }).join('');
 }
