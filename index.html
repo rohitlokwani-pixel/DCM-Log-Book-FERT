@@ -10895,7 +10895,7 @@ function currentShiftKey(){
 }
 function onEntryContextChange(){
   const {shift,key} = currentShiftKey();
-  document.getElementById("shift_indicator").textContent = "This hour falls in: "+shift+" shift";
+  document.getElementById("shift_indicator").textContent = "This hour falls in: "+shift;
   // Sync shift selector to match the detected shift
   const shiftSel = document.getElementById("e_shift_select");
   if(shiftSel) shiftSel.value = shift;
@@ -11125,7 +11125,33 @@ async function submitHourEntry(){
   };
   // Save to Supabase
   try{
-    const {error}=await sb.from('hourly_entries').upsert({date,hour,shift,operator:operatorName,area:area,readings:entry.readings,alert_tags:alertTags,remarks:entry.remarks,status:'Pending Review',qr_scanned_at:entry.qrScannedAt,imported:false},{onConflict:'date,hour,operator'});
+    // Check if entry already exists for this date+hour+operator
+    const existingInDb = await sb.from('hourly_entries')
+      .select('id')
+      .eq('date', date)
+      .eq('hour', hour)
+      .eq('operator', operatorName);
+    
+    let saveError;
+    if(existingInDb.data && existingInDb.data.length > 0){
+      // Update existing entry
+      const dbId = existingInDb.data[0].id;
+      const {error} = await sb.from('hourly_entries').update({
+        shift, area:area, readings:entry.readings, alert_tags:alertTags,
+        remarks:entry.remarks, status:'Pending Review', qr_scanned_at:entry.qrScannedAt
+      }).eq('id', dbId);
+      saveError = error;
+      if(!error) entry.id = dbId;
+    } else {
+      // Insert new entry
+      const {error} = await sb.from('hourly_entries').insert({
+        date, hour, shift, operator:operatorName, area:area,
+        readings:entry.readings, alert_tags:alertTags, remarks:entry.remarks,
+        status:'Pending Review', qr_scanned_at:entry.qrScannedAt, imported:false
+      });
+      saveError = error;
+    }
+    const error = saveError;
     if(error) throw error;
     hideCloudError();
   }catch(err){
