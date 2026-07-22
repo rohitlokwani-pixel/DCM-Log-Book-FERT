@@ -10391,7 +10391,8 @@ canvas.sigpad{width:100%;height:120px;border:1.5px solid var(--border);border-ra
     <div class="card">
       <label class="lbl">Remarks (optional)</label>
       <textarea id="e_rem" rows="2" placeholder="Any observations for this hour..."></textarea>
-      <button class="btn btn-green" onclick="submitHourEntry()">✅ Submit This Hour's Reading</button>
+      <div id="lock_warning" style="display:none;background:#fff3cd;border:1px solid #ffc107;border-radius:8px;padding:8px;font-size:11px;font-weight:700;color:#856404;margin-bottom:8px"></div>
+      <button class="btn btn-green" id="submit_entry_btn" onclick="submitHourEntry()">✅ Submit This Hour's Reading</button>
     </div>
   </div>
 </div>
@@ -10579,6 +10580,28 @@ canvas.sigpad{width:100%;height:120px;border:1.5px solid var(--border);border-ra
     <div class="mini" id="import_status" style="margin-top:6px"></div>
   </div>
   <div class="as">
+    <div class="at">⏰ Entry Timing Rules</div>
+    <label class="lbl">Backfill Window (hours back operator can fill)</label>
+    <select id="admin_backfill_hours" style="margin-bottom:8px">
+      <option value="1">1 hour</option>
+      <option value="2">2 hours</option>
+      <option value="3" selected>3 hours (default)</option>
+      <option value="4">4 hours</option>
+      <option value="6">6 hours</option>
+      <option value="8">Full shift (8 hours)</option>
+      <option value="999">Unlimited</option>
+    </select>
+    <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:8px">
+      <label style="display:flex;align-items:center;gap:8px;font-size:12px">
+        <input type="checkbox" id="admin_allow_future"> Allow future hour entries
+      </label>
+      <label style="display:flex;align-items:center;gap:8px;font-size:12px">
+        <input type="checkbox" id="admin_allow_cross_shift"> Allow cross-day backfill
+      </label>
+    </div>
+    <button class="btn btn-blue" onclick="saveEntryRules()">💾 Save Entry Rules</button>
+  </div>
+  <div class="as">
     <div class="at">🎚️ Alert Ranges (Min / Max per Tag)</div>
     <div id="admin_thresholds"></div>
     <button class="btn btn-blue" onclick="saveThresholds()">💾 Save All Ranges</button>
@@ -10717,6 +10740,11 @@ function tagStatus(tag, val){
 let settings = {
   ranges: Object.fromEntries(TAGS.map(t=>[t.id,{min:t.min,max:t.max}])),
   recipients: {incharge:"rohitlokwani@dcmshriram.com", hod:"amitkumra@dcmshriram.com"},
+  entryRules: {
+    backfillHours: 3,        // how many hours back operator can fill
+    allowFuture: false,      // block future hours
+    allowCrossShift: false,  // block filling previous shift hours
+  }
 };
 
 // Official shift-verification QR code value — must match the printed QR posted at the CCP unit.
@@ -10758,6 +10786,7 @@ async function loadFromSupabase(){
       const rec=Object.fromEntries(sData.map(r=>[r.key,r.value]));
       if(rec.recipients) settings.recipients=rec.recipients;
       if(rec.ranges){ TAGS.forEach(t=>{ if(rec.ranges[t.id]){ t.min=rec.ranges[t.id].min; t.max=rec.ranges[t.id].max; settings.ranges[t.id]=rec.ranges[t.id]; } }); }
+      if(rec.entryRules) settings.entryRules=rec.entryRules;
     }
     supabaseReady=true;
     hideCloudError();
@@ -10872,14 +10901,60 @@ function switchTab(key){
   if(key==="admin") renderAdmin();
 }
 
+function isHourLocked(hourStr, dateStr){
+  // Admin can disable all restrictions
+  const rules = settings.entryRules || {backfillHours:3, allowFuture:false, allowCrossShift:false};
+  const now = new Date();
+  const today = toDateStr(now);
+
+  // Build a Date object for the selected hour
+  const hh = parseInt(hourStr.slice(0,2));
+  const mm = parseInt(hourStr.slice(2));
+  const entryTime = new Date(dateStr);
+  entryTime.setHours(hh, mm, 0, 0);
+
+  const diffMs = now - entryTime;
+  const diffHours = diffMs / (1000*60*60);
+
+  // Future hours — blocked unless admin allows
+  if(!rules.allowFuture && diffHours < 0) return "Future hour — cannot log in advance";
+
+  // Too far in the past — blocked beyond backfill window
+  if(diffHours > rules.backfillHours) return `Locked — only last ${rules.backfillHours} hours allowed`;
+
+  // Cross-shift check — if entry date is different from today
+  if(!rules.allowCrossShift && dateStr !== today) return "Cross-day entry not allowed";
+
+  return null; // not locked
+}
+
 function initEntryDefaults(){
   const now=new Date();
   document.getElementById("e_date").value = toDateStr(now);
   const hourSel=document.getElementById("e_hour");
   hourSel.innerHTML="";
-  HOURS.forEach(h=>hourSel.add(new Option(h.slice(0,2)+":"+h.slice(2)+" hrs",h)));
+
+  const today = toDateStr(now);
+  HOURS.forEach(h=>{
+    const locked = isHourLocked(h, today);
+    const label = h.slice(0,2)+":"+h.slice(2)+" hrs" + (locked?" 🔒":"");
+    const opt = new Option(label, h);
+    if(locked){ opt.disabled = true; opt.style.color="#999"; }
+    hourSel.add(opt);
+  });
+
+  // Default to most recent unlocked hour
   const curHourStr = String(now.getHours()).padStart(2,"0")+"00";
-  hourSel.value = HOURS.includes(curHourStr)?curHourStr:HOURS[0];
+  // Find closest non-locked hour
+  let bestHour = HOURS[0];
+  for(let i=HOURS.length-1;i>=0;i--){
+    if(!isHourLocked(HOURS[i], today)){
+      bestHour = HOURS[i];
+      break;
+    }
+  }
+  hourSel.value = HOURS.includes(curHourStr) && !isHourLocked(curHourStr, today) ? curHourStr : bestHour;
+
   // Pre-fill operator name from login
   const nameField = document.getElementById("e_operator_name");
   if(nameField && currentUser && currentUser!=="Shift Incharge (shared login)" && currentUser!=="Admin"){
@@ -10895,7 +10970,22 @@ function currentShiftKey(){
 }
 function onEntryContextChange(){
   const {shift,key} = currentShiftKey();
+  const date = document.getElementById("e_date").value;
+  const hour = document.getElementById("e_hour").value;
   document.getElementById("shift_indicator").textContent = "This hour falls in: "+shift;
+
+  // Check if selected hour is locked
+  const lockReason = isHourLocked(hour, date);
+  const submitBtn = document.getElementById("submit_entry_btn");
+  const lockWarn = document.getElementById("lock_warning");
+  if(lockReason){
+    if(lockWarn) { lockWarn.textContent = "🔒 "+lockReason; lockWarn.style.display="block"; }
+    if(submitBtn) submitBtn.disabled = true;
+  } else {
+    if(lockWarn) lockWarn.style.display="none";
+    if(submitBtn) submitBtn.disabled = false;
+  }
+
   // Sync shift selector to match the detected shift
   const shiftSel = document.getElementById("e_shift_select");
   if(shiftSel) shiftSel.value = shift;
@@ -11104,6 +11194,8 @@ async function submitHourEntry(){
 
   if(!operatorName){ toast("⚠️ Enter your name before submitting"); return; }
 
+  const lockReason = isHourLocked(hour, date);
+  if(lockReason){ toast("🔒 "+lockReason); return; }
   const readings={}; let missing=[];
   TAGS.forEach(t=>{
     const v=document.getElementById("v_"+t.id)?.value;
@@ -11136,10 +11228,10 @@ async function submitHourEntry(){
     if(existingInDb.data && existingInDb.data.length > 0){
       // Update existing entry
       const dbId = existingInDb.data[0].id;
-      const {error} = await sb.from('hourly_entries').update({
+      const {error} = await sb.from('hourly_entries').eq('id', dbId).update({
         shift, area:area, readings:entry.readings, alert_tags:alertTags,
         remarks:entry.remarks, status:'Pending Review', qr_scanned_at:entry.qrScannedAt
-      }).eq('id', dbId);
+      });
       saveError = error;
       if(!error) entry.id = dbId;
     } else {
@@ -11365,7 +11457,7 @@ async function confirmApprove(){
   const entry = entries.find(e=>String(e.id)===String(id));
   if(!entry){ toast("Entry not found — please reload"); return; }
   entry.status="Reviewed"; entry.reviewedBy=name; entry.reviewedAt=new Date().toISOString();
-  const {error} = await sb.from('hourly_entries').update({status:'Reviewed',reviewed_by:name,reviewed_at:entry.reviewedAt}).eq('id',id);
+  const {error} = await sb.from('hourly_entries').eq('id',id).update({status:'Reviewed',reviewed_by:name,reviewed_at:entry.reviewedAt});
   if(error){ showCloudError("Could not save approval: "+error.message); return; }
   await sb.from('audit_log').insert({actor:name,action:'Entry approved',detail:'Entry #'+id+' approved by '+name}).catch(()=>{});
   log_audit(name,"Entry approved","Entry #"+id+" approved by "+name);
@@ -11389,7 +11481,7 @@ async function confirmReject(){
   const entry = entries.find(e=>String(e.id)===String(id));
   if(!entry){ toast("Entry not found — please reload"); return; }
   entry.status="Rejected"; entry.rejectComment=comment; entry.reviewedBy=name; entry.reviewedAt=new Date().toISOString();
-  const {error} = await sb.from('hourly_entries').update({status:'Rejected',reviewed_by:name,reviewed_at:entry.reviewedAt,reject_comment:comment}).eq('id',id);
+  const {error} = await sb.from('hourly_entries').eq('id',id).update({status:'Rejected',reviewed_by:name,reviewed_at:entry.reviewedAt,reject_comment:comment});
   if(error){ showCloudError("Could not save rejection: "+error.message); return; }
   await sb.from('audit_log').insert({actor:name,action:'Entry rejected',detail:'Entry #'+id+': '+comment}).catch(()=>{});
   log_audit(name,"Entry rejected","Entry #"+id+": "+comment);
@@ -11428,6 +11520,29 @@ function downloadAuditCSV(){
   const hdrs=["Timestamp","Actor","Action","Detail"];
   const rows=auditLog.map(a=>[a.ts,a.actor,a.action,a.detail||""].map(v=>`"${String(v).replace(/"/g,'""')}"`).join(","));
   triggerDownload([hdrs.join(","),...rows].join("\n"),"CCP_Audit_Trail.csv");
+}
+
+// ══ TOUCH SCROLL HELPER FOR CHARTS ══
+// Chart.js captures touch events preventing native scroll — this re-enables it
+function addTouchScroll(wrapperId){
+  const wrap = document.getElementById(wrapperId);
+  if(!wrap || wrap._touchScrollWired) return;
+  wrap._touchScrollWired = true;
+  let startX, startScroll, isDragging=false;
+  wrap.addEventListener("touchstart", e=>{
+    if(e.touches.length!==1) return;
+    isDragging=true;
+    startX = e.touches[0].clientX;
+    startScroll = wrap.scrollLeft;
+  }, {passive:true});
+  wrap.addEventListener("touchmove", e=>{
+    if(!isDragging || e.touches.length!==1) return;
+    const dx = startX - e.touches[0].clientX;
+    wrap.scrollLeft = startScroll + dx;
+    // Only prevent default if scrolling horizontally (not vertical page scroll)
+    if(Math.abs(dx) > 5) e.preventDefault();
+  }, {passive:false});
+  wrap.addEventListener("touchend", ()=>{ isDragging=false; }, {passive:true});
 }
 
 // ══ ANALYSIS: CURRENT STATUS CARDS ══
@@ -11574,6 +11689,7 @@ function renderBarChart(){
   barChartInstance=new Chart(canvas.getContext("2d"),{type:"bar",data:{labels,datasets},
     options:{responsive:false,maintainAspectRatio:false,plugins:{legend:{position:"bottom",labels:{font:{size:9}}}},scales:{x:{ticks:{maxRotation:60,minRotation:60,font:{size:9}}}}}});
   canvas.style.touchAction = 'pan-x';
+  addTouchScroll("bar_scroll_wrap");
   const shiftLabel=shiftFilter==="All"?"all shifts averaged":shiftFilter+" only";
   document.getElementById("bar_range_note").textContent=`Showing ${dayCount} day(s) from ${fromStr} to ${toStr} · ${shiftLabel}`+(dayCount>10?" — scroll sideways →":"");
 }
@@ -11627,8 +11743,9 @@ function renderTrendChart(){
       scales:{x:{ticks:{maxRotation:70,minRotation:70,font:{size:8},autoSkip:true,maxTicksLimit:30}}},
       events:['mousemove','mouseout','click','touchstart','touchmove'],
     }});
-  // Allow horizontal scroll through the canvas on mobile
   canvas.style.touchAction = 'pan-x';
+  // Manual touch scroll — bypass Chart.js touch capture
+  addTouchScroll("trend_scroll_wrap");
   document.getElementById("trend_range_note").textContent=`${labels.length} hourly point(s) from ${fromStr} to ${toStr}`+(neededW>minW?" — scroll sideways →":"");
 }
 
@@ -11895,6 +12012,18 @@ function importCsvData(){
   });
 }
 
+async function saveEntryRules(){
+  const backfill = parseInt(document.getElementById("admin_backfill_hours").value);
+  const allowFuture = document.getElementById("admin_allow_future").checked;
+  const allowCrossShift = document.getElementById("admin_allow_cross_shift").checked;
+  settings.entryRules = {backfillHours: backfill, allowFuture, allowCrossShift};
+  await sb.from('settings').upsert({key:'entryRules', value:settings.entryRules, updated_at:new Date().toISOString()}).catch(e=>console.error(e));
+  await sb.from('audit_log').insert({actor:currentUser, action:'Updated entry timing rules', detail:`Backfill: ${backfill}h, Future: ${allowFuture}, CrossShift: ${allowCrossShift}`}).catch(()=>{});
+  log_audit(currentUser,"Updated entry timing rules","");
+  toast("✅ Entry timing rules saved");
+  // Refresh entry form if operator is logged in
+  if(currentRole==="operator") initEntryDefaults();
+}
 function renderAdmin(){
   const wrap=document.getElementById("admin_thresholds"); wrap.innerHTML="";
   SECTIONS.forEach(s=>{
@@ -11909,6 +12038,11 @@ function renderAdmin(){
   });
   document.getElementById("rec_incharge").value=settings.recipients.incharge;
   document.getElementById("rec_hod").value=settings.recipients.hod;
+  // Populate entry rules
+  const rules = settings.entryRules || {backfillHours:3, allowFuture:false, allowCrossShift:false};
+  document.getElementById("admin_backfill_hours").value = String(rules.backfillHours||3);
+  document.getElementById("admin_allow_future").checked = !!rules.allowFuture;
+  document.getElementById("admin_allow_cross_shift").checked = !!rules.allowCrossShift;
 }
 async function saveThresholds(){
   TAGS.forEach(t=>{
