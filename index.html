@@ -10300,6 +10300,7 @@ canvas.sigpad{width:100%;height:120px;border:1.5px solid var(--border);border-ra
     </div>
     <div class="login-err" id="login_err"></div>
     <button class="login-btn" onclick="doLogin()">Login →</button>
+
   </div>
 </div>
 
@@ -10375,8 +10376,8 @@ canvas.sigpad{width:100%;height:120px;border:1.5px solid var(--border);border-ra
 
   <div class="card" id="sig_card" style="display:none">
     <div class="ct">✍️ Shift Start Signature</div>
-    <p class="mini" style="margin-bottom:8px">Sign once at shift start — covers all hourly entries you log during this shift.</p>
-    <canvas class="sigpad" id="sig_pad"></canvas>
+    <p class="mini" style="margin-bottom:8px">Sign once at shift start — covers all hourly entries you log during this shift. <strong>On laptop: click and drag to sign.</strong></p>
+    <canvas class="sigpad" id="sig_pad" style="cursor:crosshair"></canvas>
     <div style="display:flex;gap:8px;margin-top:8px">
       <button class="btn btn-outline" style="margin-bottom:0" onclick="clearSig('sig_pad')">Clear</button>
     </div>
@@ -10791,6 +10792,7 @@ function hideCloudError(){ const el=document.getElementById('cloud_error_banner'
 let currentRole = null, currentUser = null;
 let qrScannedShifts = {};   // key `${date}_${shift}` -> true
 let signedShifts = {};      // key `${date}_${shift}` -> true
+let demoMode = false;
 let qrStream = null;
 let activeSecTab = "LUBE";
 let activeStatSecTab = "LUBE";
@@ -11033,7 +11035,16 @@ function onQrSuccess(simulated){
   document.getElementById("qr_status").textContent="✅ Verified"+(simulated?" (manual)":" (QR scan)")+" at "+new Date().toLocaleTimeString();
   log_audit(currentUser,"QR scan (shift start)",key+(simulated?" [MANUAL VERIFICATION — camera unavailable]":""));
   toast("✅ Shift verified — sign to unlock hourly entry");
-  setTimeout(()=>{ onEntryContextChange(); setupSig("sig_pad"); },50);
+  // Explicitly hide QR card and show signature card
+  document.getElementById("qr_card").style.display="none";
+  document.getElementById("sig_card").style.display="block";
+  document.getElementById("entry_sections").style.display="none";
+  // Wait for browser to render sig_card before initializing canvas
+  setTimeout(()=>{
+    const c = document.getElementById("sig_pad");
+    if(c) c._wired = false; // reset so setupSig re-initializes
+    setupSig("sig_pad");
+  }, 150);
 }
 
 function initSigPad(){ setupSig("sig_pad"); }
