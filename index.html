@@ -10365,11 +10365,11 @@ canvas.sigpad{width:100%;height:120px;border:1.5px solid var(--border);border-ra
       <button class="btn btn-blue" id="qr_scan_btn" onclick="startQrScan()">📷 Start Camera Scan</button>
       <button class="btn btn-outline" id="qr_switch_btn" onclick="switchQrCamera()" style="display:none">🔄 Switch Camera (front/back)</button>
       <button class="btn btn-outline" id="qr_demo_btn" onclick="simulateQrScan()" style="display:none">✔️ Manual Verification (camera unavailable)</button>
-      <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">
-        <div style="font-size:10px;color:var(--muted);margin-bottom:6px">On laptop or if camera can't read QR:</div>
+      <div style="margin-top:10px;padding:10px;background:#f0f4ff;border-radius:10px;border:1.5px solid var(--border)">
+        <div style="font-size:11px;font-weight:700;color:var(--blue);margin-bottom:6px">🔑 On laptop — enter verification code:</div>
         <div style="display:flex;gap:6px">
-          <input type="password" id="manual_verify_pass" placeholder="Enter shift verification code" style="margin-bottom:0;flex:1;font-size:12px">
-          <button class="btn btn-outline" style="margin-bottom:0;padding:8px 12px;white-space:nowrap" onclick="manualVerify()">✔️ Verify</button>
+          <input type="password" id="manual_verify_pass" placeholder="Enter code (shown on QR poster)" style="margin-bottom:0;flex:1;font-size:12px">
+          <button class="btn btn-blue" style="margin-bottom:0;padding:8px 14px;white-space:nowrap;min-width:80px" onclick="manualVerify()">✔️ Verify</button>
         </div>
       </div>
     </div>
@@ -10400,6 +10400,16 @@ canvas.sigpad{width:100%;height:120px;border:1.5px solid var(--border);border-ra
 <div class="page" id="page_records">
   <div class="card">
     <div class="ct">📁 Entries</div>
+    <div class="row2" style="margin-bottom:8px">
+      <div><label class="lbl">From</label><input type="date" id="records_from" onchange="renderRecords()"></div>
+      <div><label class="lbl">To</label><input type="date" id="records_to" onchange="renderRecords()"></div>
+    </div>
+    <div style="display:flex;gap:6px;margin-bottom:10px">
+      <button class="btn btn-outline" style="margin-bottom:0;flex:1;font-size:10px" onclick="setRecordsDatePreset(1)">Today</button>
+      <button class="btn btn-outline" style="margin-bottom:0;flex:1;font-size:10px" onclick="setRecordsDatePreset(7)">Last 7d</button>
+      <button class="btn btn-outline" style="margin-bottom:0;flex:1;font-size:10px" onclick="setRecordsDatePreset(30)">Last 30d</button>
+      <button class="btn btn-outline" style="margin-bottom:0;flex:1;font-size:10px" onclick="setRecordsDatePreset(0)">All</button>
+    </div>
     <div id="records_filter_tabs" style="display:flex;gap:6px;margin-bottom:10px;overflow-x:auto">
       <button class="sec-tab active" id="rf_all" onclick="setRecordsFilter('all')">All</button>
       <button class="sec-tab" id="rf_pending" onclick="setRecordsFilter('pending')">⏳ Pending</button>
@@ -10446,8 +10456,12 @@ canvas.sigpad{width:100%;height:120px;border:1.5px solid var(--border);border-ra
       <button class="btn btn-outline" style="margin-bottom:0;flex:1" onclick="setBarPreset(15)">Last 15d</button>
       <button class="btn btn-outline" style="margin-bottom:0;flex:1" onclick="setBarPreset(30)">Last 30d</button>
     </div>
-    <div style="overflow-x:auto;-webkit-overflow-scrolling:touch;border:1px solid var(--border);border-radius:8px;padding:6px 2px" id="bar_scroll_wrap">
-      <div id="bar_canvas_holder"><canvas id="bar_chart" height="180" style="touch-action:pan-x"></canvas></div>
+    <div style="position:relative">
+      <button onclick="scrollChart('bar_scroll_wrap',-200)" style="position:absolute;left:0;top:50%;transform:translateY(-50%);z-index:10;background:var(--blue);color:#fff;border:none;border-radius:50%;width:32px;height:32px;font-size:16px;cursor:pointer;opacity:0.8">‹</button>
+      <div style="overflow-x:auto;-webkit-overflow-scrolling:touch;border:1px solid var(--border);border-radius:8px;padding:6px 36px" id="bar_scroll_wrap">
+        <div id="bar_canvas_holder"><canvas id="bar_chart" height="180" style="touch-action:pan-x"></canvas></div>
+      </div>
+      <button onclick="scrollChart('bar_scroll_wrap',200)" style="position:absolute;right:0;top:50%;transform:translateY(-50%);z-index:10;background:var(--blue);color:#fff;border:none;border-radius:50%;width:32px;height:32px;font-size:16px;cursor:pointer;opacity:0.8">›</button>
     </div>
     <div class="mini" id="bar_range_note"></div>
   </div>
@@ -10465,8 +10479,12 @@ canvas.sigpad{width:100%;height:120px;border:1.5px solid var(--border);border-ra
       <button class="btn btn-outline" style="margin-bottom:0;flex:1" onclick="setTrendPreset(15)">Last 15d</button>
       <button class="btn btn-outline" style="margin-bottom:0;flex:1" onclick="setTrendPreset(30)">Last 30d</button>
     </div>
-    <div style="overflow-x:auto;-webkit-overflow-scrolling:touch;border:1px solid var(--border);border-radius:8px;padding:6px 2px" id="trend_scroll_wrap">
-      <div id="trend_canvas_holder"><canvas id="trend_chart" height="200" style="touch-action:pan-x"></canvas></div>
+    <div style="position:relative">
+      <button onclick="scrollChart('trend_scroll_wrap',-200)" style="position:absolute;left:0;top:50%;transform:translateY(-50%);z-index:10;background:var(--blue);color:#fff;border:none;border-radius:50%;width:32px;height:32px;font-size:16px;cursor:pointer;opacity:0.8">‹</button>
+      <div style="overflow-x:auto;-webkit-overflow-scrolling:touch;border:1px solid var(--border);border-radius:8px;padding:6px 36px" id="trend_scroll_wrap">
+        <div id="trend_canvas_holder"><canvas id="trend_chart" height="200" style="touch-action:pan-x"></canvas></div>
+      </div>
+      <button onclick="scrollChart('trend_scroll_wrap',200)" style="position:absolute;right:0;top:50%;transform:translateY(-50%);z-index:10;background:var(--blue);color:#fff;border:none;border-radius:50%;width:32px;height:32px;font-size:16px;cursor:pointer;opacity:0.8">›</button>
     </div>
     <div class="mini" id="trend_range_note"></div>
   </div>
@@ -10862,7 +10880,12 @@ function switchTab(key){
   if(key==="records"){
     const filterTabs = document.getElementById("records_filter_tabs");
     if(filterTabs) filterTabs.style.display = currentRole==="hod" ? "none" : "flex";
-    renderRecords();
+    // Default to today if no date set
+    if(!document.getElementById("records_from")?.value){
+      setRecordsDatePreset(1);
+    } else {
+      renderRecords();
+    }
   }
   if(key==="analysis") renderAnalysis();
   if(key==="download") renderDownloadTags();
@@ -11202,6 +11225,19 @@ async function confirmIncident(){
 }
 
 // ══ RECORDS ══
+function setRecordsDatePreset(days){
+  const to = new Date();
+  document.getElementById("records_to").value = toDateStr(to);
+  if(days===0){
+    document.getElementById("records_from").value = "";
+  } else {
+    const from = new Date();
+    from.setDate(from.getDate()-(days-1));
+    document.getElementById("records_from").value = toDateStr(from);
+  }
+  renderRecords();
+}
+
 let recordsFilter = "all";
 function setRecordsFilter(f){
   recordsFilter = f;
@@ -11221,7 +11257,13 @@ function renderRecords(){
   } else {
     visible = entries;
   }
-  // Apply filter tabs
+  // Apply date range filter
+  const fromDate = document.getElementById("records_from")?.value;
+  const toDate = document.getElementById("records_to")?.value;
+  if(fromDate) visible = visible.filter(e=>e.date >= fromDate);
+  if(toDate) visible = visible.filter(e=>e.date <= toDate);
+
+  // Apply status filter tabs
   if(recordsFilter==="pending") visible = visible.filter(e=>e.status==="Pending Review");
   else if(recordsFilter==="approved") visible = visible.filter(e=>e.status==="Reviewed");
   else if(recordsFilter==="rejected") visible = visible.filter(e=>e.status==="Rejected");
@@ -11434,27 +11476,35 @@ function downloadAuditCSV(){
   triggerDownload([hdrs.join(","),...rows].join("\n"),"CCP_Audit_Trail.csv");
 }
 
+// ══ CHART SCROLL HELPER ══
+function scrollChart(wrapperId, amount){
+  const wrap = document.getElementById(wrapperId);
+  if(wrap) wrap.scrollBy({left: amount, behavior:'smooth'});
+}
+
 // ══ TOUCH SCROLL HELPER FOR CHARTS ══
-// Chart.js captures touch events preventing native scroll — this re-enables it
 function addTouchScroll(wrapperId){
   const wrap = document.getElementById(wrapperId);
   if(!wrap || wrap._touchScrollWired) return;
   wrap._touchScrollWired = true;
-  let startX, startScroll, isDragging=false;
+  let startX, startScrollLeft, isScrolling=false;
+
   wrap.addEventListener("touchstart", e=>{
-    if(e.touches.length!==1) return;
-    isDragging=true;
-    startX = e.touches[0].clientX;
-    startScroll = wrap.scrollLeft;
+    if(e.touches.length !== 1) return;
+    startX = e.touches[0].pageX;
+    startScrollLeft = wrap.scrollLeft;
+    isScrolling = true;
   }, {passive:true});
+
   wrap.addEventListener("touchmove", e=>{
-    if(!isDragging || e.touches.length!==1) return;
-    const dx = startX - e.touches[0].clientX;
-    wrap.scrollLeft = startScroll + dx;
-    // Only prevent default if scrolling horizontally (not vertical page scroll)
-    if(Math.abs(dx) > 5) e.preventDefault();
+    if(!isScrolling || e.touches.length !== 1) return;
+    const dx = startX - e.touches[0].pageX;
+    wrap.scrollLeft = startScrollLeft + dx;
+    e.preventDefault(); // prevent page scroll while chart scrolling
   }, {passive:false});
-  wrap.addEventListener("touchend", ()=>{ isDragging=false; }, {passive:true});
+
+  wrap.addEventListener("touchend", ()=>{ isScrolling = false; }, {passive:true});
+  wrap.addEventListener("touchcancel", ()=>{ isScrolling = false; }, {passive:true});
 }
 
 // ══ ANALYSIS: CURRENT STATUS CARDS ══
@@ -11599,8 +11649,13 @@ function renderBarChart(){
   if(barChartInstance) barChartInstance.destroy();
   const canvas=document.getElementById("bar_chart"); canvas.width=neededW;
   barChartInstance=new Chart(canvas.getContext("2d"),{type:"bar",data:{labels,datasets},
-    options:{responsive:false,maintainAspectRatio:false,plugins:{legend:{position:"bottom",labels:{font:{size:9}}}},scales:{x:{ticks:{maxRotation:60,minRotation:60,font:{size:9}}}}}});
+    options:{responsive:false,maintainAspectRatio:false,
+      plugins:{legend:{position:"bottom",labels:{font:{size:9}}}},
+      scales:{x:{ticks:{maxRotation:60,minRotation:60,font:{size:9}}}},
+      events:['mousemove','mouseout','click'], // NO touch events
+    }});
   canvas.style.touchAction = 'pan-x';
+  canvas.style.pointerEvents = 'none';
   addTouchScroll("bar_scroll_wrap");
   const shiftLabel=shiftFilter==="All"?"all shifts averaged":shiftFilter+" only";
   document.getElementById("bar_range_note").textContent=`Showing ${dayCount} day(s) from ${fromStr} to ${toStr} · ${shiftLabel}`+(dayCount>10?" — scroll sideways →":"");
@@ -11649,14 +11704,15 @@ function renderTrendChart(){
   document.getElementById("trend_canvas_holder").style.width=neededW+"px";
   if(trendChartInstance) trendChartInstance.destroy();
   const canvas=document.getElementById("trend_chart"); canvas.width=neededW;
+  // Disable ALL Chart.js touch events so the scroll container gets them instead
   trendChartInstance=new Chart(canvas.getContext("2d"),{type:"line",data:{labels,datasets},
     options:{responsive:false,maintainAspectRatio:false,
       plugins:{legend:{position:"bottom",labels:{font:{size:9}}}},
       scales:{x:{ticks:{maxRotation:70,minRotation:70,font:{size:8},autoSkip:true,maxTicksLimit:30}}},
-      events:['mousemove','mouseout','click','touchstart','touchmove'],
+      events:['mousemove','mouseout','click'], // NO touch events — we handle scroll manually
     }});
   canvas.style.touchAction = 'pan-x';
-  // Manual touch scroll — bypass Chart.js touch capture
+  canvas.style.pointerEvents = 'none'; // let touches pass through canvas to wrapper
   addTouchScroll("trend_scroll_wrap");
   document.getElementById("trend_range_note").textContent=`${labels.length} hourly point(s) from ${fromStr} to ${toStr}`+(neededW>minW?" — scroll sideways →":"");
 }
