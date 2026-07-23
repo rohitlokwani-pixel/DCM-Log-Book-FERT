@@ -10366,11 +10366,9 @@ canvas.sigpad{width:100%;height:120px;border:1.5px solid var(--border);border-ra
       <button class="btn btn-outline" id="qr_switch_btn" onclick="switchQrCamera()" style="display:none">🔄 Switch Camera (front/back)</button>
       <button class="btn btn-outline" id="qr_demo_btn" onclick="simulateQrScan()" style="display:none">✔️ Manual Verification (camera unavailable)</button>
       <div style="margin-top:10px;padding:10px;background:#f0f4ff;border-radius:10px;border:1.5px solid var(--border)">
-        <div style="font-size:11px;font-weight:700;color:var(--blue);margin-bottom:6px">🔑 On laptop — enter verification code:</div>
-        <div style="display:flex;gap:6px">
-          <input type="password" id="manual_verify_pass" placeholder="Enter code (shown on QR poster)" style="margin-bottom:0;flex:1;font-size:12px">
-          <button class="btn btn-blue" style="margin-bottom:0;padding:8px 14px;white-space:nowrap;min-width:80px" onclick="manualVerify()">✔️ Verify</button>
-        </div>
+        <div style="font-size:11px;font-weight:700;color:var(--blue);margin-bottom:8px">🔑 On laptop — enter verification code:</div>
+        <input type="text" id="manual_verify_pass" placeholder="Type: DCM-CCP-UREA-01" style="margin-bottom:8px;font-size:13px;letter-spacing:1px">
+        <button class="btn btn-blue" style="margin-bottom:0" onclick="manualVerify()">✔️ Verify</button>
       </div>
     </div>
   </div>
@@ -10468,6 +10466,10 @@ canvas.sigpad{width:100%;height:120px;border:1.5px solid var(--border);border-ra
 
   <div class="card">
     <div class="ct">📈 Trend (select up to 6 tags)</div>
+    <div style="display:flex;gap:6px;margin-bottom:8px">
+      <button class="sec-tab active" id="trend_mode_raw" onclick="setTrendMode('raw')">🕐 Raw Hourly</button>
+      <button class="sec-tab" id="trend_mode_avg" onclick="setTrendMode('avg')">📅 Daily Average</button>
+    </div>
     <div id="trend_select" style="margin-bottom:8px"></div>
     <div class="row2" style="margin-bottom:8px">
       <div><label class="lbl">From</label><input type="date" id="trend_from" onchange="onTrendRangeChange()"></div>
@@ -11538,11 +11540,11 @@ function onStatAvgRangeChange(){
 function computeStatValues(){
   const vals={}, meta={};
   if(statMode==="latest"){
-    entries.forEach(e=>{ Object.entries(e.readings||{}).forEach(([k,v])=>{ if(!(k in vals)) { vals[k]=v; meta[k]=e.date+" "+e.hour; } }); });
+    visibleEntries().forEach(e=>{ Object.entries(e.readings||{}).forEach(([k,v])=>{ if(!(k in vals)) { vals[k]=v; meta[k]=e.date+" "+e.hour; } }); });
   } else {
     const fromStr = document.getElementById("statavg_from").value || toDateStr(new Date());
     const toStr = document.getElementById("statavg_to").value || fromStr;
-    const rangeEntries = entries.filter(e=>e.date>=fromStr && e.date<=toStr);
+    const rangeEntries = visibleEntries().filter(e=>e.date>=fromStr && e.date<=toStr);
     TAGS.forEach(t=>{
       const nums = rangeEntries.filter(e=>e.readings[t.id]!==undefined).map(e=>e.readings[t.id]);
       if(nums.length){
@@ -11636,7 +11638,7 @@ function renderBarChart(){
   const datasets=selectedBarTags.map((tid,i)=>{
     const t=TAGS.find(x=>x.id===tid);
     const data=labels.map(date=>{
-      let dayE=entries.filter(e=>e.readings[tid]!==undefined&&e.date===date);
+      let dayE=visibleEntries().filter(e=>e.readings[tid]!==undefined&&e.date===date);
       if(shiftFilter!=="All") dayE=dayE.filter(e=>e.shift===shiftFilter);
       if(!dayE.length) return null;
       return +(dayE.reduce((a,e)=>a+e.readings[tid],0)/dayE.length).toFixed(2);
@@ -11650,12 +11652,15 @@ function renderBarChart(){
   const canvas=document.getElementById("bar_chart"); canvas.width=neededW;
   barChartInstance=new Chart(canvas.getContext("2d"),{type:"bar",data:{labels,datasets},
     options:{responsive:false,maintainAspectRatio:false,
-      plugins:{legend:{position:"bottom",labels:{font:{size:9}}}},
+      plugins:{
+        legend:{position:"bottom",labels:{font:{size:9}}},
+        tooltip:{enabled:true, mode:'index', intersect:false},
+      },
       scales:{x:{ticks:{maxRotation:60,minRotation:60,font:{size:9}}}},
-      events:['mousemove','mouseout','click'], // NO touch events
+      events:['mousemove','mouseout','click'],
     }});
   canvas.style.touchAction = 'pan-x';
-  canvas.style.pointerEvents = 'none';
+  canvas.style.pointerEvents = 'auto';
   addTouchScroll("bar_scroll_wrap");
   const shiftLabel=shiftFilter==="All"?"all shifts averaged":shiftFilter+" only";
   document.getElementById("bar_range_note").textContent=`Showing ${dayCount} day(s) from ${fromStr} to ${toStr} · ${shiftLabel}`+(dayCount>10?" — scroll sideways →":"");
@@ -11664,6 +11669,14 @@ function renderBarChart(){
 // ══ TREND ══
 let trendChartInstance=null;
 let selectedTrendTags=["OIL_IN","OIL_OUT","COMBINED_TEMP"];
+let trendMode = "raw"; // "raw" = hourly points, "avg" = daily average
+
+function setTrendMode(mode){
+  trendMode = mode;
+  document.getElementById("trend_mode_raw").classList.toggle("active", mode==="raw");
+  document.getElementById("trend_mode_avg").classList.toggle("active", mode==="avg");
+  renderTrendChart();
+}
 function renderTrendSelector(){
   const wrap=document.getElementById("trend_select"); wrap.innerHTML="";
   TAGS.forEach(t=>{
@@ -11686,35 +11699,64 @@ function renderTrendChart(){
   const fromStr=document.getElementById("trend_from").value, toStr=document.getElementById("trend_to").value;
   const from=new Date(fromStr), to=new Date(toStr);
   const dayCount=Math.max(1,Math.round((to-from)/86400000)+1);
-  // hourly granularity: build label per (date,hour) combination present in range, sorted
-  const rangeEntries = entries.filter(e=>e.date>=fromStr&&e.date<=toStr).sort((a,b)=>(a.date+a.hour).localeCompare(b.date+b.hour));
-  const labels = [...new Set(rangeEntries.map(e=>e.date+" "+e.hour))];
+  const rangeEntries = visibleEntries().filter(e=>e.date>=fromStr&&e.date<=toStr).sort((a,b)=>(a.date+a.hour).localeCompare(b.date+b.hour));
   const colors=["#1565c0","#f4a261","#2d6a4f","#9c27b0","#e63946","#00838f"];
-  const datasets=selectedTrendTags.map((tid,i)=>{
-    const t=TAGS.find(x=>x.id===tid);
-    const data=labels.map(lbl=>{
-      const match=rangeEntries.find(e=>(e.date+" "+e.hour)===lbl && e.readings[tid]!==undefined);
-      return match?match.readings[tid]:null;
+
+  let labels, datasets;
+
+  if(trendMode==="avg"){
+    // Daily average mode — one point per day
+    const days=[];
+    for(let i=0;i<dayCount;i++){ const d=new Date(from); d.setDate(d.getDate()+i); days.push(toDateStr(d)); }
+    labels = days;
+    datasets = selectedTrendTags.map((tid,i)=>{
+      const t=TAGS.find(x=>x.id===tid);
+      const data=days.map(date=>{
+        const dayE=rangeEntries.filter(e=>e.date===date&&e.readings[tid]!==undefined);
+        if(!dayE.length) return null;
+        return +(dayE.reduce((a,e)=>a+e.readings[tid],0)/dayE.length).toFixed(2);
+      });
+      return {label:t.name+" (avg)",data,borderColor:colors[i%colors.length],backgroundColor:colors[i%colors.length]+"22",fill:true,tension:.35,spanGaps:true,pointRadius:3,pointHoverRadius:6,borderWidth:2};
     });
-    return {label:t.name,data,borderColor:colors[i%colors.length],backgroundColor:"transparent",tension:.25,spanGaps:true,pointRadius:dayCount>15?1.5:dayCount>3?2:3,pointHoverRadius:5,borderWidth:2};
-  });
-  const pxPerPoint = dayCount<=1?60:dayCount<=7?18:8;
+  } else {
+    // Raw hourly mode — one point per entry
+    labels = [...new Set(rangeEntries.map(e=>e.date+" "+e.hour))];
+    datasets = selectedTrendTags.map((tid,i)=>{
+      const t=TAGS.find(x=>x.id===tid);
+      const data=labels.map(lbl=>{
+        const match=rangeEntries.find(e=>(e.date+" "+e.hour)===lbl && e.readings[tid]!==undefined);
+        return match?match.readings[tid]:null;
+      });
+      return {label:t.name,data,borderColor:colors[i%colors.length],backgroundColor:"transparent",tension:.25,spanGaps:true,pointRadius:dayCount>15?1.5:dayCount>3?2:3,pointHoverRadius:5,borderWidth:2};
+    });
+  }
+  const pxPerPoint = trendMode==="avg" ? (dayCount<=7?60:dayCount<=15?40:25) : (dayCount<=1?60:dayCount<=7?18:8);
   const wrapEl=document.getElementById("trend_scroll_wrap"); const minW=wrapEl.clientWidth||300;
   const neededW=Math.max(minW, labels.length*pxPerPoint);
   document.getElementById("trend_canvas_holder").style.width=neededW+"px";
   if(trendChartInstance) trendChartInstance.destroy();
   const canvas=document.getElementById("trend_chart"); canvas.width=neededW;
-  // Disable ALL Chart.js touch events so the scroll container gets them instead
   trendChartInstance=new Chart(canvas.getContext("2d"),{type:"line",data:{labels,datasets},
     options:{responsive:false,maintainAspectRatio:false,
-      plugins:{legend:{position:"bottom",labels:{font:{size:9}}}},
+      plugins:{
+        legend:{position:"bottom",labels:{font:{size:9}}},
+        tooltip:{
+          enabled:true,
+          mode:'index',
+          intersect:false,
+          callbacks:{
+            label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y}`
+          }
+        },
+        datalabels: false,
+      },
       scales:{x:{ticks:{maxRotation:70,minRotation:70,font:{size:8},autoSkip:true,maxTicksLimit:30}}},
-      events:['mousemove','mouseout','click'], // NO touch events — we handle scroll manually
+      events:['mousemove','mouseout','click'],
     }});
   canvas.style.touchAction = 'pan-x';
-  canvas.style.pointerEvents = 'none'; // let touches pass through canvas to wrapper
+  canvas.style.pointerEvents = 'auto'; // re-enable for tooltips on hover
   addTouchScroll("trend_scroll_wrap");
-  document.getElementById("trend_range_note").textContent=`${labels.length} hourly point(s) from ${fromStr} to ${toStr}`+(neededW>minW?" — scroll sideways →":"");
+  document.getElementById("trend_range_note").textContent=`${labels.length} ${trendMode==="avg"?"daily avg":"hourly"} point(s) from ${fromStr} to ${toStr}`+(neededW>minW?" — use ‹ › arrows or swipe →":"");
 }
 
 // ══ MIN/MAX/AVG SUMMARY ══
@@ -11724,7 +11766,7 @@ function onSummaryRangeChange(){ const f=document.getElementById("summary_from")
 function renderSummaryTable(){
   if(!document.getElementById("summary_from").value){ setSummaryPreset(7); return; }
   const fromStr=document.getElementById("summary_from").value, toStr=document.getElementById("summary_to").value;
-  const rangeE=entries.filter(e=>e.date>=fromStr&&e.date<=toStr);
+  const rangeE=visibleEntries().filter(e=>e.date>=fromStr&&e.date<=toStr);
   const table=document.getElementById("summary_table");
   let html=`<tr><td class="k" style="font-weight:800">Tag</td><td class="k" style="font-weight:800">Min</td><td class="k" style="font-weight:800">Max</td><td class="k" style="font-weight:800">Avg</td><td class="k" style="font-weight:800">Band</td></tr>`;
   TAGS.forEach(t=>{
@@ -11752,7 +11794,7 @@ function renderCorrelationChart(){
   const xId=document.getElementById("corr_x_select").value, yId=document.getElementById("corr_y_select").value;
   const gx=TAGS.find(t=>t.id===xId), gy=TAGS.find(t=>t.id===yId);
   const fromStr=document.getElementById("corr_from").value, toStr=document.getElementById("corr_to").value;
-  const points=entries.filter(e=>e.readings[xId]!==undefined&&e.readings[yId]!==undefined&&e.date>=fromStr&&e.date<=toStr)
+  const points=visibleEntries().filter(e=>e.readings[xId]!==undefined&&e.readings[yId]!==undefined&&e.date>=fromStr&&e.date<=toStr)
     .map(e=>({x:e.readings[xId],y:e.readings[yId]}));
   if(corrChartInstance) corrChartInstance.destroy();
   corrChartInstance=new Chart(document.getElementById("corr_chart").getContext("2d"),{type:"scatter",
@@ -11776,7 +11818,7 @@ function renderCorrelationChart(){
 function renderAlertSummary(){
   const wrap=document.getElementById("alert_summary");
   const counts={};
-  entries.forEach(e=>(e.alertTags||[]).forEach(tid=>counts[tid]=(counts[tid]||0)+1));
+  visibleEntries().forEach(e=>(e.alertTags||[]).forEach(tid=>counts[tid]=(counts[tid]||0)+1));
   const total=Object.values(counts).reduce((a,b)=>a+b,0);
   if(!total){ wrap.innerHTML='<div class="empty">No out-of-range readings recorded ✅</div>'; return; }
   wrap.innerHTML=Object.entries(counts).sort((a,b)=>b[1]-a[1]).map(([tid,c])=>{
@@ -11784,6 +11826,12 @@ function renderAlertSummary(){
     return `<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #f0f2f8">
       <span style="font-size:12px">${t?t.name:tid}</span><span class="badge b-alert">${c} out-of-range</span></div>`;
   }).join("");
+}
+
+// Returns entries filtered by role — HoD sees only Reviewed entries
+function visibleEntries(){
+  if(currentRole==="hod") return entries.filter(e=>e.status==="Reviewed");
+  return entries;
 }
 
 function renderAnalysis(){
