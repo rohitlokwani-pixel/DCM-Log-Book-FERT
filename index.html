@@ -10920,7 +10920,8 @@ function initEntryDefaults(){
 // ══ ENTRY FLOW ══
 function currentShiftKey(){
   const date=document.getElementById("e_date").value, hour=document.getElementById("e_hour").value;
-  return {date, hour, shift:shiftForHour(hour), key: date+"_"+shiftForHour(hour)};
+  const shift=shiftForHour(hour);
+  return {date, hour, shift, key: date+"_"+shift};
 }
 function onEntryContextChange(){
   const {shift,key} = currentShiftKey();
@@ -11072,7 +11073,11 @@ function confirmShiftSignatureAndUnlock(){
   signedShifts[key]=true;
   log_audit(currentUser,"Shift signature captured",key);
   toast("✅ Shift verified — hourly entry unlocked");
-  onEntryContextChange();
+  // Directly show entry sections
+  document.getElementById("sig_card").style.display="none";
+  document.getElementById("qr_card").style.display="none";
+  document.getElementById("entry_sections").style.display="block";
+  buildEntrySections();
 }
 
 function buildEntrySections(){
