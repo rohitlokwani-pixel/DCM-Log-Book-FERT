@@ -11078,6 +11078,10 @@ function confirmShiftSignatureAndUnlock(){
   document.getElementById("qr_card").style.display="none";
   document.getElementById("entry_sections").style.display="block";
   buildEntrySections();
+  // Scroll to entry sections so user can see them
+  setTimeout(()=>{
+    document.getElementById("entry_sections").scrollIntoView({behavior:"smooth", block:"start"});
+  }, 200);
 }
 
 function buildEntrySections(){
