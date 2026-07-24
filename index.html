@@ -10921,7 +10921,8 @@ function initEntryDefaults(){
 function currentShiftKey(){
   const date=document.getElementById("e_date").value, hour=document.getElementById("e_hour").value;
   const shift=shiftForHour(hour);
-  return {date, hour, shift, key: date+"_"+shift};
+  // Use date only as key — one verification per day covers all shifts
+  return {date, hour, shift, key: date};
 }
 function onEntryContextChange(){
   const {shift,key} = currentShiftKey();
@@ -11143,8 +11144,12 @@ function checkFieldInput(tagId){
 
 async function submitHourEntry(){
   const {date,hour,key}=currentShiftKey();
-  if(!qrScannedShifts[key]){ toast("⚠️ Scan QR to start this shift first"); return; }
-  if(!signedShifts[key]){ toast("⚠️ Confirm your shift signature first"); return; }
+  // If entry sections are visible, verification already completed — skip re-check
+  const entrySectionsVisible = document.getElementById("entry_sections").style.display !== "none";
+  if(!entrySectionsVisible){
+    if(!qrScannedShifts[key]){ toast("⚠️ Scan QR to start this shift first"); return; }
+    if(!signedShifts[key]){ toast("⚠️ Confirm your shift signature first"); return; }
+  }
 
   // Get operator name, shift and area from form
   const operatorName = currentUser;
