@@ -10172,9 +10172,9 @@ var sb={
 </script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
-body{font-family:'Segoe UI',system-ui,sans-serif;background:#f0f4ff;color:#1a2340;min-height:100vh;padding-bottom:70px}
-:root{--navy:#0a1628;--blue:#1565c0;--light:#f0f4ff;--border:#dde3ee;--text:#1a2340;--muted:#6b7a99;--alert:#e63946;--warn:#f4a261;--ok:#2d6a4f;--gold:#f4a261;}
-#login_screen{position:fixed;inset:0;background:var(--navy);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;overflow-y:auto}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:#e8f4fd;color:#1a2340;min-height:100vh;padding-bottom:70px}
+:root{--navy:#0a1628;--blue:#0d47a1;--light:#e8f4fd;--border:#b3d4f0;--text:#0a1628;--muted:#4a6080;--alert:#c62828;--warn:#e65100;--ok:#00695c;--gold:#f57f17;--teal:#00838f;--teal-light:#e0f7fa;}
+#login_screen{position:fixed;inset:0;background:linear-gradient(160deg,#050e1a 0%,#0a1628 50%,#0d3b6e 100%);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;overflow-y:auto}
 .login-logo{font-size:40px;margin-bottom:6px}
 .login-co{font-size:17px;font-weight:800;color:#fff;text-align:center}
 .login-dept{font-size:11px;color:rgba(255,255,255,.55);text-align:center;margin-bottom:14px}
@@ -10185,24 +10185,24 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#f0f4ff;color:#1a234
 .login-title{font-size:14px;font-weight:700;color:var(--navy);margin-bottom:3px;text-align:center}
 .login-sub{font-size:10px;color:var(--muted);text-align:center;margin-bottom:12px}
 .login-inp{width:100%;padding:10px 13px;border-radius:10px;border:1.5px solid var(--border);font-size:13px;margin-bottom:9px;background:#fafbff}
-.login-btn{width:100%;padding:12px;border-radius:10px;border:none;background:var(--blue);color:#fff;font-size:14px;font-weight:700;cursor:pointer}
+.login-btn{width:100%;padding:12px;border-radius:10px;border:none;background:var(--teal);color:#fff;font-size:14px;font-weight:700;cursor:pointer}
 .login-err{color:var(--alert);font-size:11px;text-align:center;margin-bottom:6px;min-height:16px;font-weight:600}
-.header{background:var(--blue);color:#fff;padding:0;position:sticky;top:0;z-index:100}
+.header{background:linear-gradient(135deg,#0a1628 0%,#0d47a1 100%);color:#fff;padding:0;position:sticky;top:0;z-index:100}
 .header-top{padding:10px 14px 6px;display:flex;justify-content:space-between;align-items:flex-start}
 .h-left .co{font-size:13px;font-weight:800}
 .h-left .dept{font-size:10px;color:rgba(255,255,255,.6)}
 .h-right{display:flex;flex-direction:column;align-items:flex-end;gap:2px}
 .r-badge{font-size:10px;padding:2px 8px;border-radius:10px;font-weight:700}
-.badge-operator{background:#90caf9;color:#0d47a1}
+.badge-operator{background:#b2ebf2;color:#006064}
 .badge-incharge{background:#c8e6c9;color:#1b5e20}
 .badge-hod{background:#ce93d8;color:#4a148c}
 .badge-admin{background:var(--gold);color:#7c3a0a}
 .tabs{display:flex;border-top:1px solid rgba(255,255,255,.15);overflow-x:auto}
 .tab{flex:1;min-width:60px;padding:9px 2px;font-size:9px;font-weight:500;color:rgba(255,255,255,.55);background:transparent;border:none;cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap}
-.tab.active{color:#fff;font-weight:700;border-bottom:2px solid #90caf9}
+.tab.active{color:#fff;font-weight:700;border-bottom:2px solid #4dd0e1}
 .body{padding:12px}
-.card{background:#fff;border-radius:12px;border:1px solid var(--border);padding:13px;margin-bottom:10px;box-shadow:0 1px 5px rgba(0,0,0,.05)}
-.ct{font-size:11px;font-weight:700;color:var(--blue);text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px}
+.card{background:#fff;border-radius:12px;border:1px solid #b3d4f0;padding:13px;margin-bottom:10px;box-shadow:0 1px 5px rgba(0,0,0,.05)}
+.ct{font-size:11px;font-weight:700;color:var(--teal);text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px}
 label.lbl{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:3px;display:block}
 input[type=text],input[type=date],input[type=time],input[type=number],input[type=password],select,textarea{width:100%;padding:9px 11px;border-radius:8px;border:1.5px solid var(--border);font-size:13px;margin-bottom:9px;background:#fafbff;color:var(--text)}
 .row2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
@@ -10210,7 +10210,7 @@ input[type=text],input[type=date],input[type=time],input[type=number],input[type
 .btn{width:100%;padding:12px;border-radius:10px;border:none;font-size:13px;font-weight:700;cursor:pointer;margin-bottom:8px}
 .btn-blue{background:var(--blue);color:#fff}
 .btn-navy{background:var(--navy);color:#fff}
-.btn-green{background:var(--ok);color:#fff}
+.btn-green{background:var(--teal);color:#fff}
 .btn-red{background:var(--alert);color:#fff}
 .btn-outline{background:#fff;border:1.5px solid var(--border);color:var(--text)}
 .btn:disabled{opacity:.5;cursor:not-allowed}
@@ -10221,10 +10221,10 @@ input[type=text],input[type=date],input[type=time],input[type=number],input[type
 .b-rejected{background:#f8d7da;color:#721c24}
 .sec-tabs{display:flex;gap:6px;margin-bottom:10px;overflow-x:auto}
 .sec-tab{padding:8px 12px;border-radius:8px;border:1.5px solid var(--border);background:#fafbff;font-size:11px;font-weight:700;color:var(--muted);white-space:nowrap;cursor:pointer}
-.sec-tab.active{background:var(--blue);color:#fff;border-color:var(--blue)}
+.sec-tab.active{background:var(--teal);color:#fff;border-color:var(--teal)}
 .sec-page{display:none}.sec-page.active{display:block}
 .gauge-field{border:1.5px solid var(--border);border-radius:10px;padding:10px;margin-bottom:9px;background:#fafbff}
-.gauge-field.hot{border-color:var(--alert);background:#fff5f5}
+.gauge-field.hot{border-color:#c62828;background:#ffebee}
 .gauge-name{font-size:12px;font-weight:700;color:var(--text);margin-bottom:5px;display:flex;justify-content:space-between}
 .gauge-limit{font-size:9px;color:var(--muted);font-weight:600}
 .qr-box{border:2px dashed var(--border);border-radius:12px;padding:16px;text-align:center;margin-bottom:10px}
@@ -10241,7 +10241,7 @@ canvas.sigpad{width:100%;height:120px;border:1.5px solid var(--border);border-ra
 .mt td{padding:3px 4px;border-bottom:1px solid #f0f2f8}
 .mt .k{color:var(--muted);font-weight:600}
 .mt .v.hot{color:var(--alert);font-weight:700}
-.incident-btn{position:fixed;bottom:76px;right:14px;background:var(--alert);color:#fff;border:none;border-radius:50%;width:54px;height:54px;font-size:22px;box-shadow:0 4px 16px rgba(230,57,70,.5);z-index:500;cursor:pointer}
+.incident-btn{position:fixed;bottom:76px;right:14px;background:#b71c1c;color:#fff;border:none;border-radius:50%;width:54px;height:54px;font-size:22px;box-shadow:0 4px 16px rgba(230,57,70,.5);z-index:500;cursor:pointer}
 .chip{display:inline-flex;align-items:center;gap:4px;background:#e3f2fd;border-radius:6px;padding:4px 9px;font-size:11px;color:var(--blue);font-weight:700;margin:2px;cursor:pointer}
 .empty{text-align:center;padding:30px 16px;color:var(--muted);font-size:12px}
 .at{font-size:11px;font-weight:700;color:#7c3a0a;text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px}
@@ -10254,7 +10254,7 @@ canvas.sigpad{width:100%;height:120px;border:1.5px solid var(--border);border-ra
 .stat-range{font-size:9px;color:var(--muted);margin-top:2px}
 .stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .pill{display:inline-block;font-size:8px;font-weight:800;padding:2px 6px;border-radius:8px;margin-top:3px}
-.pill-ok{background:#d4edda;color:#155724}
+.pill-ok{background:#e0f2f1;color:#004d40}
 .pill-high{background:#fde8e8;color:#c0392b}
 .pill-low{background:#e3f2fd;color:#0d47a1}
 </style>
@@ -10884,9 +10884,10 @@ function switchTab(key){
   if(key==="records"){
     const filterTabs = document.getElementById("records_filter_tabs");
     if(filterTabs) filterTabs.style.display = currentRole==="hod" ? "none" : "flex";
-    // Default to today if no date set
+    // HoD defaults to approved, others default to all
+    if(currentRole==="hod") recordsFilter = "approved";
     if(!document.getElementById("records_from")?.value){
-      setRecordsDatePreset(1);
+      setRecordsDatePreset(30);
     } else {
       renderRecords();
     }
@@ -11290,13 +11291,15 @@ function renderRecords(){
   if(fromDate) visible = visible.filter(e=>e.date >= fromDate);
   if(toDate) visible = visible.filter(e=>e.date <= toDate);
 
-  // Apply status filter tabs
-  if(recordsFilter==="pending") visible = visible.filter(e=>e.status==="Pending Review");
-  else if(recordsFilter==="approved") visible = visible.filter(e=>e.status==="Reviewed");
-  else if(recordsFilter==="rejected") visible = visible.filter(e=>e.status==="Rejected");
+  // Apply status filter tabs (not for HoD — they always see only Reviewed)
+  if(currentRole!=="hod"){
+    if(recordsFilter==="pending") visible = visible.filter(e=>e.status==="Pending Review");
+    else if(recordsFilter==="approved") visible = visible.filter(e=>e.status==="Reviewed");
+    else if(recordsFilter==="rejected") visible = visible.filter(e=>e.status==="Rejected");
+  }
 
   if(!visible.length){
-    wrap.innerHTML=`<div class="empty">No ${recordsFilter==="all"?"":recordsFilter+" "}entries found</div>`;
+    wrap.innerHTML=`<div class="empty">${currentRole==="hod"?"No approved entries yet — entries appear here after Incharge reviews them":("No "+(recordsFilter==="all"?"":recordsFilter+" ")+"entries found")}</div>`;
     return;
   }
   wrap.innerHTML = visible.slice(0,60).map(e=>{
