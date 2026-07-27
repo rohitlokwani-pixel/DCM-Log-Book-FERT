@@ -10153,7 +10153,9 @@ var sb={
       },
       upsert:async function(data,opts){
         try{var h=Object.assign({},_sbHeaders(),{"Prefer":"resolution=merge-duplicates,return=representation"});
-          var r=await fetch(SUPABASE_URL+"/rest/v1/"+_table,{method:"POST",headers:h,body:JSON.stringify(data)});
+          var url=SUPABASE_URL+"/rest/v1/"+_table;
+          if(opts && opts.onConflict){ url += "?on_conflict="+encodeURIComponent(opts.onConflict); }
+          var r=await fetch(url,{method:"POST",headers:h,body:JSON.stringify(data)});
           if(!r.ok){var e=await r.text();return {data:null,error:{message:e}};}
           var t=await r.text();return {data:t?JSON.parse(t):[],error:null};
         }catch(e){return {data:null,error:{message:e.message}};}
@@ -10710,7 +10712,6 @@ const TAGS = [
   {id:"MAIN_8", section:"SEAL_FLUSH", name:"Main Pump Pressure (PI-8)", unit:"Kg/cm²g", min:120, max:140},
   // C.C. PUMP (FIELD)
   {id:"BP_MOTOR", section:"CCP_FIELD", name:"Booster Pump Motor", unit:"Amps", min:60, max:100},
-  {id:"BP_SUCTION", section:"CCP_FIELD", name:"Booster Pump Suction Pressure", unit:"Kg/cm²g", min:20, max:25},
   {id:"BP_DISCHARGE", section:"CCP_FIELD", name:"Booster Pump Discharge Pressure", unit:"Kg/cm²g", min:26, max:40},
   {id:"MP_MOTOR", section:"CCP_FIELD", name:"Main Pump Motor", unit:"Amps", min:120, max:155},
   {id:"MP_FLOW", section:"CCP_FIELD", name:"Main Pump Flow", unit:"GPM", min:0, max:400},
@@ -10743,6 +10744,8 @@ function rangeText(tag){
 }
 function tagStatus(tag, val){
   if(isNaN(val)) return null;
+  // If alerts disabled for this tag, always return ok (no alert)
+  if(tag.alertEnabled === false) return "ok";
   if(tag.min!=null && val<tag.min) return "low";
   if(tag.max!=null && val>tag.max) return "high";
   return "ok";
@@ -11896,7 +11899,7 @@ function drawSCADAGauge(canvas, tag, value){
 
 // ══ MULTI-TAG BAR COMPARISON ══
 let barChartInstance=null;
-let selectedBarTags=["BP_SUCTION","BP_DISCHARGE"];
+let selectedBarTags=["BP_DISCHARGE","MP_DISCHARGE"];
 function renderBarTagSelector(){
   const wrap=document.getElementById("bar_tag_select"); wrap.innerHTML="";
   TAGS.forEach(t=>{
@@ -12371,30 +12374,35 @@ function importCsvData(){
 }
 
 async function clearAllData(){
-  const confirm = document.getElementById("clear_confirm_inp").value.trim();
-  if(confirm !== "CONFIRM DELETE"){
-    toast("⚠️ Type CONFIRM DELETE exactly to proceed");
+  const confirmVal = document.getElementById("clear_confirm_inp").value.trim();
+  if(confirmVal !== "CONFIRM DELETE"){
+    toast("⚠️ Type CONFIRM DELETE exactly (all capitals) to proceed");
     return;
   }
   toast("⏳ Clearing all data...");
   try{
-    // Delete all entries
-    await sb.from('hourly_entries').eq('id', 'id').update({status:'deleted'}).catch(()=>{});
-    const {error:e1} = await fetch(SUPABASE_URL+"/rest/v1/hourly_entries?id=gte.0",{
-      method:"DELETE", headers:_sbHeaders()
-    }).then(r=>r.ok?{error:null}:{error:{message:'failed'}});
-    // Delete audit log
-    await fetch(SUPABASE_URL+"/rest/v1/audit_log?id=gte.0",{
-      method:"DELETE", headers:_sbHeaders()
+    // Delete all entries — use a filter that matches all rows
+    const h = _sbHeaders();
+    const delEntries = await fetch(SUPABASE_URL+"/rest/v1/hourly_entries?date=not.is.null",{
+      method:"DELETE", headers:h
+    });
+    const delAudit = await fetch(SUPABASE_URL+"/rest/v1/audit_log?id=not.is.null",{
+      method:"DELETE", headers:h
     });
     // Clear local cache
     entries = [];
-    auditLog = [];
-    incidents = [];
+    if(typeof auditLog !== "undefined") auditLog = [];
+    if(typeof incidents !== "undefined") incidents = [];
     document.getElementById("clear_confirm_inp").value = "";
+    // Refresh UI
+    if(typeof renderRecords === "function") renderRecords();
     await loadFromSupabase();
-    toast("✅ All data cleared — fresh start ready!");
-    log_audit(currentUser, "🗑️ CLEARED ALL DATA", "Admin cleared all entries and audit log");
+    if(delEntries.ok){
+      toast("✅ All data cleared — fresh start ready!");
+    } else {
+      const errText = await delEntries.text();
+      toast("⚠️ Entries clear may have failed: "+errText.slice(0,60));
+    }
   } catch(err){
     toast("❌ Error clearing data: " + err.message);
   }
@@ -12406,9 +12414,17 @@ function renderAdmin(){
     const h=document.createElement("div"); h.style.cssText="font-size:10px;font-weight:800;color:var(--muted);margin:8px 0 4px;text-transform:uppercase";
     h.textContent=s.label; wrap.appendChild(h);
     TAGS.filter(t=>t.section===s.id).forEach(t=>{
-      const div=document.createElement("div"); div.className="row2"; div.style.marginBottom="8px";
-      div.innerHTML=`<div><label class="lbl">${t.name} Min</label><input type="number" step="0.01" id="min_${t.id}" value="${settings.ranges[t.id].min??''}" placeholder="none"></div>
-        <div><label class="lbl">${t.name} Max</label><input type="number" step="0.01" id="max_${t.id}" value="${settings.ranges[t.id].max??''}" placeholder="none"></div>`;
+      if(t.type==="text"||t.type==="select"||t.type==="motor") return; // no ranges for non-numeric
+      const div=document.createElement("div"); div.style.marginBottom="10px"; div.style.padding="8px"; div.style.background="#fafbff"; div.style.borderRadius="8px"; div.style.border="1px solid var(--border)";
+      const alertOn = settings.ranges[t.id].alertEnabled !== false; // default on
+      div.innerHTML=`<div style="font-size:11px;font-weight:700;color:var(--text);margin-bottom:6px">${t.name}</div>
+        <div class="row2" style="margin-bottom:6px">
+          <div><label class="lbl">Min</label><input type="number" step="0.01" id="min_${t.id}" value="${settings.ranges[t.id].min??''}" placeholder="none"></div>
+          <div><label class="lbl">Max</label><input type="number" step="0.01" id="max_${t.id}" value="${settings.ranges[t.id].max??''}" placeholder="none"></div>
+        </div>
+        <label style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted)">
+          <input type="checkbox" id="alert_${t.id}" ${alertOn?'checked':''}> 🔔 Trigger alert when out of range
+        </label>`;
       wrap.appendChild(div);
     });
   });
@@ -12418,20 +12434,24 @@ function renderAdmin(){
 }
 async function saveThresholds(){
   TAGS.forEach(t=>{
-    const minV=document.getElementById("min_"+t.id).value, maxV=document.getElementById("max_"+t.id).value;
+    if(t.type==="text"||t.type==="select"||t.type==="motor") return;
+    const minEl=document.getElementById("min_"+t.id), maxEl=document.getElementById("max_"+t.id), alertEl=document.getElementById("alert_"+t.id);
+    if(!minEl) return;
+    const minV=minEl.value, maxV=maxEl.value;
     settings.ranges[t.id].min = minV===""?null:parseFloat(minV);
     settings.ranges[t.id].max = maxV===""?null:parseFloat(maxV);
-    t.min=settings.ranges[t.id].min; t.max=settings.ranges[t.id].max;
+    settings.ranges[t.id].alertEnabled = alertEl ? alertEl.checked : true;
+    t.min=settings.ranges[t.id].min; t.max=settings.ranges[t.id].max; t.alertEnabled=settings.ranges[t.id].alertEnabled;
   });
-  await sb.from('settings').upsert({key:'ranges',value:settings.ranges,updated_at:new Date().toISOString()}).catch(e=>console.error(e));
+  await sb.from('settings').upsert({key:'ranges',value:settings.ranges,updated_at:new Date().toISOString()},{onConflict:'key'}).catch(e=>console.error(e));
   await sb.from('audit_log').insert({actor:currentUser,action:'Updated alert ranges',detail:''}).catch(()=>{});
   log_audit(currentUser,"Updated alert ranges","");
-  toast("✅ Ranges saved");
+  toast("✅ Ranges & alerts saved");
 }
 async function saveRecipients(){
   settings.recipients.incharge=document.getElementById("rec_incharge").value;
   settings.recipients.hod=document.getElementById("rec_hod").value;
-  await sb.from('settings').upsert({key:'recipients',value:settings.recipients,updated_at:new Date().toISOString()}).catch(e=>console.error(e));
+  await sb.from('settings').upsert({key:'recipients',value:settings.recipients,updated_at:new Date().toISOString()},{onConflict:'key'}).catch(e=>console.error(e));
   await sb.from('audit_log').insert({actor:currentUser,action:'Updated notification recipients',detail:''}).catch(()=>{});
   log_audit(currentUser,"Updated notification recipients","");
   toast("✅ Recipients saved");
