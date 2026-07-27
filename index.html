@@ -10933,10 +10933,6 @@ function onEntryContextChange(){
   const {shift,key} = currentShiftKey();
   const date = document.getElementById("e_date").value;
   const hour = document.getElementById("e_hour").value;
-  document.getElementById("shift_indicator").textContent = "This hour falls in: "+shift;
-
-  // Sync shift selector
-  if(shiftSel) shiftSel.value = shift;
   const qrDone = !!qrScannedShifts[key];
   const sigDone = !!signedShifts[key];
   document.getElementById("qr_card").style.display = qrDone?"none":"block";
@@ -10949,7 +10945,8 @@ function onEntryContextChange(){
     document.getElementById("qr_status").textContent="Scan the QR code posted at the CCP unit to unlock this shift's entries.";
     document.getElementById("qr_scan_btn").style.display="block";
     document.getElementById("qr_switch_btn").style.display="none";
-    document.getElementById("qr_demo_btn").style.display="none";
+    const demoBtn = document.getElementById("qr_demo_btn");
+    if(demoBtn) demoBtn.style.display="none";
   }
 }
 
@@ -11326,7 +11323,6 @@ async function submitHourEntry(){
   }
   document.getElementById("e_rem").value="";
   // After submit, require a fresh scan for the next hour reading (tamper-proof)
-  const key = date;
   qrScannedShifts[key] = false;
   signedShifts[key] = false;
   document.getElementById("entry_sections").style.display="none";
