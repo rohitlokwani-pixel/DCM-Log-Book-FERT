@@ -4,6 +4,13 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>DCM Shriram — CCP Urea Plant Logbook</title>
+<!-- PWA setup -->
+<meta name="theme-color" content="#0a1628">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="CCP Logbook">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="manifest" href="manifest.json">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <script>window.Chart||document.write('<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"><\/script>')</script>
 <script>/* jsQR v1.4.0 embedded inline - no network dependency for QR scanning */
@@ -10114,6 +10121,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
 <script>window.jspdf||document.write('<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"><\/script>')</script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
 <script>window.Papa||document.write('<script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"><\/script>')</script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script>
 // Direct REST helper — no library, plain fetch — same pattern as the working panel temp logbook
 var SUPABASE_URL = "https://okatrbnrjmbsxdtgtmbk.supabase.co";
@@ -10591,12 +10599,12 @@ canvas.sigpad{width:100%;height:120px;border:1.5px solid var(--border);border-ra
 <!-- ADMIN -->
 <div class="page" id="page_admin">
   <div class="as">
-    <div class="at">📥 Import Historical Data (CSV)</div>
+    <div class="at">📥 Import Historical Data (CSV or Excel)</div>
     <p class="mini" style="margin-bottom:8px">For backfilling old paper log data already typed into a spreadsheet. Download the template first so columns match exactly — imported rows skip QR/signature verification and are clearly marked "Imported" everywhere they appear.</p>
     <button class="btn btn-outline" onclick="downloadCsvTemplate()">📄 Download CSV Template</button>
-    <label class="lbl">Choose CSV file</label>
-    <input type="file" id="import_csv_file" accept=".csv" style="margin-bottom:8px">
-    <button class="btn btn-navy" onclick="importCsvData()">📥 Import Selected File</button>
+    <label class="lbl">Choose CSV or Excel file (.csv / .xlsx)</label>
+    <input type="file" id="import_csv_file" accept=".csv,.xlsx,.xls" style="margin-bottom:8px">
+    <button class="btn btn-navy" onclick="importFile()">📥 Import Selected File</button>
     <div class="mini" id="import_status" style="margin-top:6px"></div>
   </div>
   <div class="as">
@@ -10617,6 +10625,13 @@ canvas.sigpad{width:100%;height:120px;border:1.5px solid var(--border);border-ra
     <select id="reset_person" style="margin-bottom:8px"><option>Rohit</option></select>
     <input type="text" id="reset_new_pass" placeholder="New password">
     <button class="btn btn-blue" onclick="adminResetPass()">🔄 Reset Password</button>
+  </div>
+  <div class="as" style="border:2px solid var(--alert)">
+    <div class="at" style="color:var(--alert)">🗑️ Clear All Data (Danger Zone)</div>
+    <p class="mini" style="color:var(--alert);margin-bottom:8px">⚠️ This will permanently delete ALL entries, audit logs and records. Use only before pilot launch or to reset test data. This cannot be undone.</p>
+    <label class="lbl">Type CONFIRM DELETE to proceed</label>
+    <input type="text" id="clear_confirm_inp" placeholder="Type: CONFIRM DELETE" style="margin-bottom:8px;border-color:var(--alert)">
+    <button class="btn" style="background:var(--alert);color:#fff;margin-bottom:0" onclick="clearAllData()">🗑️ Clear All Data Permanently</button>
   </div>
 </div>
 
@@ -10681,14 +10696,15 @@ const SECTIONS = [
 const TAGS = [
   // LUBE OIL SYSTEM
   {id:"AUX_AMPS", section:"LUBE", name:"Aux Oil Pump", unit:"Amps", min:0, max:4},
-  {id:"OIL_IN", section:"LUBE", name:"Oil Cooler Temp In (TI-4A)", unit:"°F", min:null, max:165},
-  {id:"OIL_OUT", section:"LUBE", name:"Oil Cooler Temp Out (TI-4B)", unit:"°F", min:null, max:125},
-  {id:"COMBINED_TEMP", section:"LUBE", name:"Combined Oil Temp (TI-5)", unit:"°F", min:null, max:160},
+  {id:"OIL_IN", section:"LUBE", name:"Oil Cooler Temp In (TI-4A)", unit:"°C", min:null, max:165},
+  {id:"OIL_OUT", section:"LUBE", name:"Oil Cooler Temp Out (TI-4B)", unit:"°C", min:null, max:125},
+  {id:"COMBINED_TEMP", section:"LUBE", name:"Combined Oil Temp (TI-5)", unit:"°C", min:null, max:160},
   {id:"FILTER_OUT", section:"LUBE", name:"Oil Filter Pressure Out", unit:"PSI", min:18, max:null},
   {id:"FILTER_DIFF", section:"LUBE", name:"Oil Filter Differential", unit:"PSI", min:null, max:20},
   // CONDENSATE SEAL FLUSH SYSTEM
-  {id:"MOTOR1", section:"SEAL_FLUSH", name:"Seal Flush Pump Motor No.1", unit:"Amps", min:6, max:10},
-  {id:"MOTOR2", section:"SEAL_FLUSH", name:"Seal Flush Pump Motor No.2", unit:"Amps", min:6, max:10},
+  {id:"MOTOR_SELECT", section:"SEAL_FLUSH", name:"Which Motor In Line?", unit:"", type:"select", options:["Motor No.1","Motor No.2"], min:null, max:null},
+  {id:"MOTOR1", section:"SEAL_FLUSH", name:"Seal Flush Pump Motor No.1", unit:"Amps", type:"motor", pair:"MOTOR_SELECT", pairValue:"Motor No.1", min:6, max:10},
+  {id:"MOTOR2", section:"SEAL_FLUSH", name:"Seal Flush Pump Motor No.2", unit:"Amps", type:"motor", pair:"MOTOR_SELECT", pairValue:"Motor No.2", min:6, max:10},
   {id:"DISCHARGE_PRESS", section:"SEAL_FLUSH", name:"Discharge Pressure (PI-9)", unit:"Kg/cm²g", min:135, max:160},
   {id:"DISCHARGE_TEMP", section:"SEAL_FLUSH", name:"Discharge Temp (TI)", unit:"°C", min:40, max:60},
   {id:"BOOSTER_SEAL_PRESS", section:"SEAL_FLUSH", name:"Booster Seal Pressure (PI-11)", unit:"Kg/cm²g", min:20, max:30},
@@ -10704,14 +10720,13 @@ const TAGS = [
   {id:"MP_DISCHARGE", section:"CCP_FIELD", name:"Main Pump Discharge Pressure", unit:"Kg/cm²g", min:200, max:255},
   {id:"GEARBOX_PRESS", section:"CCP_FIELD", name:"Booster Gear Box Oil Pressure", unit:"Kg/cm²", min:2.1, max:4.2},
   {id:"GEARBOX_TEMP", section:"CCP_FIELD", name:"Booster Gear Box Oil Temp", unit:"°C", min:null, max:65},
-  {id:"OIL_FILTER_1", section:"CCP_FIELD", name:"Oil Filter In Line No.1", unit:"Kg/cm²", min:null, max:null},
-  {id:"OIL_FILTER_2", section:"CCP_FIELD", name:"Oil Filter In Line No.2", unit:"Kg/cm²", min:null, max:null},
+  {id:"OIL_FILTER_SELECT", section:"CCP_FIELD", name:"Oil Filter In Line", unit:"", type:"select", options:["No.1 In Line","No.2 In Line"], min:null, max:null},
   {id:"SFCF_1", section:"CCP_FIELD", name:"Seal Flush Cond. Filter No.1 Out", unit:"Kg/cm²g", min:5, max:8},
   {id:"SFCF_2", section:"CCP_FIELD", name:"Seal Flush Cond. Filter No.2 Out", unit:"Kg/cm²g", min:5, max:8},
   {id:"SFCF_DIFF", section:"CCP_FIELD", name:"Seal Flush Cond. Filter Diff", unit:"Kg/cm²", min:null, max:1.0},
-  {id:"LEAK_BOOSTER", section:"CCP_FIELD", name:"Seal Leakage — Booster Pump", unit:"CC/MIN", min:null, max:650},
-  {id:"LEAK_MAIN_LP", section:"CCP_FIELD", name:"Seal Leakage — Main Pump (LP Side)", unit:"CC/MIN", min:null, max:650},
-  {id:"LEAK_MAIN_HP", section:"CCP_FIELD", name:"Seal Leakage — Main Pump (HP Side)", unit:"CC/MIN", min:null, max:650},
+  {id:"LEAK_BOOSTER", section:"CCP_FIELD", name:"Seal Leakage — Booster Pump", unit:"", type:"text", min:null, max:null},
+  {id:"LEAK_MAIN_LP", section:"CCP_FIELD", name:"Seal Leakage — Main Pump (LP Side)", unit:"", type:"text", min:null, max:null},
+  {id:"LEAK_MAIN_HP", section:"CCP_FIELD", name:"Seal Leakage — Main Pump (HP Side)", unit:"", type:"text", min:null, max:null},
 ];
 
 const HOURS = ["0630","0730","0830","0930","1030","1130","1230","1330","1430","1530","1630","1730","1830","1930","2030","2130","2230","2330","0030","0130","0230","0330","0430","0530"];
@@ -11031,21 +11046,46 @@ function simulateQrScan(){ onQrSuccess(true); }
 function onQrSuccess(simulated){
   const {key}=currentShiftKey();
   qrScannedShifts[key]=true;
+  // Store scan time and auto-detected shift
+  const scanTime = new Date();
+  const scanDate = toDateStr(scanTime);
+  const scanShift = shiftForHour(String(scanTime.getHours()).padStart(2,"0")+"00");
+  qrScannedShifts[scanDate+"_meta"] = {date: scanDate, shift: scanShift, time: scanTime.toISOString()};
+
   if(qrStream){ qrStream.getTracks().forEach(t=>t.stop()); }
   document.getElementById("qr_video").style.display="none";
   document.getElementById("qr_switch_btn").style.display="none";
   document.getElementById("qr_box").classList.add("scanned");
-  document.getElementById("qr_status").textContent="✅ Verified"+(simulated?" (manual)":" (QR scan)")+" at "+new Date().toLocaleTimeString();
-  log_audit(currentUser,"QR scan (shift start)",key+(simulated?" [MANUAL VERIFICATION — camera unavailable]":""));
-  toast("✅ Shift verified — sign to unlock hourly entry");
+  document.getElementById("qr_status").textContent="✅ Verified"+(simulated?" (manual)":" (QR scan)")+" at "+scanTime.toLocaleTimeString()+` — ${scanShift}`;
+  log_audit(currentUser,"QR scan (shift start)",key+(simulated?" [MANUAL VERIFICATION]":"")+" — "+scanShift+" at "+scanTime.toLocaleTimeString());
+  toast("✅ Shift verified — "+scanShift+" — sign to unlock hourly entry");
+
+  // Lock date and shift to scan time values
+  document.getElementById("e_date").value = scanDate;
+  document.getElementById("e_date").readOnly = true;
+  document.getElementById("e_date").style.background = "#f0f4ff";
+  document.getElementById("e_date").style.color = "#0d47a1";
+  document.getElementById("e_date").style.fontWeight = "700";
+
+  const shiftSel = document.getElementById("e_shift_select");
+  if(shiftSel){
+    shiftSel.value = scanShift;
+    shiftSel.disabled = true;
+    shiftSel.style.background = "#f0f4ff";
+    shiftSel.style.color = "#0d47a1";
+    shiftSel.style.fontWeight = "700";
+  }
+
+  // Update shift indicator
+  document.getElementById("shift_indicator").textContent = "This hour falls in: "+scanShift+" (locked from QR scan)";
+
   // Explicitly hide QR card and show signature card
   document.getElementById("qr_card").style.display="none";
   document.getElementById("sig_card").style.display="block";
   document.getElementById("entry_sections").style.display="none";
-  // Wait for browser to render sig_card before initializing canvas
   setTimeout(()=>{
     const c = document.getElementById("sig_pad");
-    if(c) c._wired = false; // reset so setupSig re-initializes
+    if(c) c._wired = false;
     setupSig("sig_pad");
   }, 150);
 }
@@ -11102,17 +11142,70 @@ function buildEntrySections(){
     let html="";
     TAGS.filter(t=>t.section===s.id).forEach(t=>{
       const prevVal = existing?.readings?.[t.id];
-      html += `<div class="gauge-field" id="field_${t.id}">
-        <div class="gauge-name">${t.name} <span class="gauge-limit">${rangeText(t)}</span></div>
-        <input type="number" step="0.01" id="v_${t.id}" placeholder="Enter ${t.unit}" value="${prevVal!=null?prevVal:''}" oninput="checkFieldInput('${t.id}')">
-        <div class="mini" id="roc_${t.id}"></div>
-      </div>`;
+      const type = t.type || "number";
+
+      if(type === "select"){
+        // Dropdown selection (Oil Filter In Line, Motor Select)
+        const opts = t.options.map(o=>`<option value="${o}" ${prevVal===o?'selected':''}>${o}</option>`).join("");
+        html += `<div class="gauge-field" id="field_${t.id}">
+          <div class="gauge-name">${t.name}</div>
+          <select id="v_${t.id}" onchange="checkFieldInput('${t.id}');updateMotorFields()" style="width:100%;padding:9px;border:1.5px solid var(--border);border-radius:8px;font-size:14px">
+            <option value="">-- Select --</option>${opts}
+          </select>
+        </div>`;
+      } else if(type === "text"){
+        // Free text (Seal Leakages)
+        html += `<div class="gauge-field" id="field_${t.id}">
+          <div class="gauge-name">${t.name}</div>
+          <input type="text" id="v_${t.id}" placeholder="e.g. Nil / Drops / Heavy" value="${prevVal!=null?prevVal:''}" style="width:100%;padding:9px;border:1.5px solid var(--border);border-radius:8px;font-size:14px">
+        </div>`;
+      } else if(type === "motor"){
+        // Motor field — shows Amps if in-line, else "Spare"
+        html += `<div class="gauge-field" id="field_${t.id}">
+          <div class="gauge-name">${t.name} <span class="gauge-limit">${rangeText(t)}</span></div>
+          <input type="number" step="0.01" id="v_${t.id}" placeholder="Enter ${t.unit}" value="${prevVal!=null?prevVal:''}" oninput="checkFieldInput('${t.id}')">
+          <div class="mini" id="spare_${t.id}" style="display:none;color:var(--muted);font-weight:700">⚙️ Spare — not in service</div>
+          <div class="mini" id="roc_${t.id}"></div>
+        </div>`;
+      } else {
+        // Default number field
+        html += `<div class="gauge-field" id="field_${t.id}">
+          <div class="gauge-name">${t.name} <span class="gauge-limit">${rangeText(t)}</span></div>
+          <input type="number" step="0.01" id="v_${t.id}" placeholder="Enter ${t.unit}" value="${prevVal!=null?prevVal:''}" oninput="checkFieldInput('${t.id}')">
+          <div class="mini" id="roc_${t.id}"></div>
+        </div>`;
+      }
     });
     div.innerHTML = html;
     pagesWrap.appendChild(div);
   });
   // Run status check on prefilled values (editing an existing hour)
   TAGS.forEach(t=>checkFieldInput(t.id));
+  updateMotorFields();
+}
+
+// Show/hide motor fields based on which motor is selected as in-line
+function updateMotorFields(){
+  const motorSelect = document.getElementById("v_MOTOR_SELECT");
+  if(!motorSelect) return;
+  const selected = motorSelect.value;
+  TAGS.filter(t=>t.type==="motor").forEach(t=>{
+    const inp = document.getElementById("v_"+t.id);
+    const spareLabel = document.getElementById("spare_"+t.id);
+    const field = document.getElementById("field_"+t.id);
+    if(!inp) return;
+    if(selected && t.pairValue !== selected){
+      // This motor is spare
+      inp.style.display = "none";
+      if(spareLabel) spareLabel.style.display = "block";
+      inp.value = ""; // clear spare motor value
+      if(field) field.classList.remove("hot");
+    } else {
+      // This motor is in line (or no selection yet)
+      inp.style.display = "block";
+      if(spareLabel) spareLabel.style.display = "none";
+    }
+  });
 }
 
 function switchSecTab(id){
@@ -11125,6 +11218,7 @@ function switchSecTab(id){
 
 function checkFieldInput(tagId){
   const tag=TAGS.find(t=>t.id===tagId);
+  if(!tag || tag.type==="text" || tag.type==="select") return; // skip non-numeric fields
   const inp=document.getElementById("v_"+tagId); if(!inp) return;
   const val=parseFloat(inp.value);
   const field=document.getElementById("field_"+tagId);
@@ -11154,19 +11248,43 @@ async function submitHourEntry(){
 
   // Get operator name, shift and area from form
   const operatorName = currentUser;
-  const shift = document.getElementById("e_shift_select")?.value || shiftForHour(hour);
+  // Get shift from QR scan time (locked) or form selector
+  const scanMeta = qrScannedShifts[date+"_meta"];
+  const shift = scanMeta ? scanMeta.shift : (document.getElementById("e_shift_select")?.value || shiftForHour(hour));
   const area = document.getElementById("e_area")?.value || "CCP Urea Plant";
 
   if(!operatorName){ toast("⚠️ Enter your name before submitting"); return; }
 
   const readings={}; let missing=[];
+  const motorSelect = document.getElementById("v_MOTOR_SELECT")?.value;
   TAGS.forEach(t=>{
-    const v=document.getElementById("v_"+t.id)?.value;
-    if(v===""||v===undefined){ missing.push(t.name); } else { readings[t.id]=parseFloat(v); }
+    const type = t.type || "number";
+    const el = document.getElementById("v_"+t.id);
+    const v = el?.value;
+
+    if(type === "text" || type === "select"){
+      // Text and select fields — store as string, required
+      if(!v || v===""){ missing.push(t.name); } else { readings[t.id]=v; }
+    } else if(type === "motor"){
+      // Motor field — spare motors don't need a value
+      if(motorSelect && t.pairValue !== motorSelect){
+        readings[t.id] = "Spare"; // mark spare motor
+      } else if(v==="" || v===undefined){
+        missing.push(t.name);
+      } else {
+        readings[t.id]=parseFloat(v);
+      }
+    } else {
+      // Number field
+      if(v===""||v===undefined){ missing.push(t.name); } else { readings[t.id]=parseFloat(v); }
+    }
   });
   if(missing.length){ toast(`⚠️ Fill all fields (${missing.length} missing) — check each section tab`); return; }
 
-  const alertTags = TAGS.filter(t=>{ const st=tagStatus(t,readings[t.id]); return st==="high"||st==="low"; }).map(t=>t.id);
+  const alertTags = TAGS.filter(t=>{ 
+    if(t.type==="text"||t.type==="select"||t.type==="motor") return false; // no alerts on non-numeric
+    const st=tagStatus(t,readings[t.id]); return st==="high"||st==="low"; 
+  }).map(t=>t.id);
 
   // Replace existing entry for this date+hour+operator if re-submitting, else create new
   const existingIdx = entries.findIndex(e=>e.date===date && e.hour===hour && e.operator===operatorName);
@@ -11320,11 +11438,25 @@ function renderRecords(){
       </div>` : "";
 
     return `<div class="rc">
-      <div class="rh"><div><div class="rt">${e.date} · ${e.hour} hrs · ${e.shift}</div><div class="rs">By ${e.operator}</div></div>
-      <div style="text-align:right"><span class="badge ${badgeClass}">${e.status}</span> ${alertBadge} ${importedBadge}</div></div>
+      <div class="rh">
+        <div style="flex:1">
+          <div class="rt">${e.date} · ${e.hour.slice(0,2)}:${e.hour.slice(2)} hrs</div>
+          <div class="rs" style="display:flex;flex-wrap:wrap;gap:4px;margin-top:3px">
+            <span style="background:#e8f4fd;color:#0d47a1;font-size:9px;font-weight:700;padding:1px 6px;border-radius:8px">🏭 ${e.area||'CCP Urea Plant'}</span>
+            <span style="background:#e0f2f1;color:#00695c;font-size:9px;font-weight:700;padding:1px 6px;border-radius:8px">⏰ ${e.shift}</span>
+            <span style="background:#f3e5f5;color:#6a1b9a;font-size:9px;font-weight:700;padding:1px 6px;border-radius:8px">👷 ${e.operator}</span>
+            ${e.createdAt?`<span style="background:#fff8e1;color:#e65100;font-size:9px;font-weight:700;padding:1px 6px;border-radius:8px">🕐 ${new Date(e.createdAt).toLocaleString('en-IN',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',hour12:true})}</span>`:''}
+            ${e.imported?`<span style="background:#e8eaf6;color:#283593;font-size:9px;font-weight:700;padding:1px 6px;border-radius:8px">📥 Imported by Admin</span>`:''}
+          </div>
+        </div>
+        <div style="text-align:right">
+          <span class="badge ${badgeClass}">${e.status}</span>
+          ${alertBadge}
+        </div>
+      </div>
       <table class="mt">${rows}</table>
       <div class="mini">Showing 6 of ${Object.keys(e.readings||{}).length} tags — full detail in Download/Analysis</div>
-      ${e.reviewedBy && e.status==="Reviewed"?`<div class="mini">✅ Reviewed by ${e.reviewedBy}</div>`:""}
+      ${e.reviewedBy && e.status==="Reviewed"?`<div style="background:#e0f2f1;border-radius:6px;padding:5px 8px;margin-top:6px;font-size:10px;color:#00695c">✅ Reviewed by <strong>${e.reviewedBy}</strong> at ${e.reviewedAt?new Date(e.reviewedAt).toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}):''}</div>`:""}
       ${rejectionBlock}
     </div>`;
   }).join("");
@@ -11394,9 +11526,14 @@ function renderPendingReviews(){
 
     return `<div class="rc">
       <div class="rh">
-        <div>
-          <div class="rt">${e.date} · ${e.hour} hrs · ${e.shift} Shift</div>
-          <div class="rs">Submitted by: <strong>${e.operator}</strong> ${e.createdAt?'at '+new Date(e.createdAt).toLocaleTimeString():''}</div>
+        <div style="flex:1">
+          <div class="rt">${e.date} · ${e.hour.slice(0,2)}:${e.hour.slice(2)} hrs</div>
+          <div class="rs" style="display:flex;flex-wrap:wrap;gap:4px;margin-top:3px">
+            <span style="background:#e8f4fd;color:#0d47a1;font-size:9px;font-weight:700;padding:1px 6px;border-radius:8px">🏭 ${e.area||'CCP Urea Plant'}</span>
+            <span style="background:#e0f2f1;color:#00695c;font-size:9px;font-weight:700;padding:1px 6px;border-radius:8px">⏰ ${e.shift}</span>
+            <span style="background:#f3e5f5;color:#6a1b9a;font-size:9px;font-weight:700;padding:1px 6px;border-radius:8px">👷 ${e.operator}</span>
+            ${e.createdAt?`<span style="background:#fff8e1;color:#e65100;font-size:9px;font-weight:700;padding:1px 6px;border-radius:8px">🕐 ${new Date(e.createdAt).toLocaleString('en-IN',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',hour12:true})}</span>`:''}
+          </div>
         </div>
         ${e.alertTags?.length?`<span class="badge b-alert">🚨 ${e.alertTags.length} alerts</span>`:'<span class="badge b-ok">✅ Normal</span>'}
       </div>
@@ -11597,41 +11734,186 @@ function renderStatCards(){
 
   statDialInstances.forEach(c=>c.destroy()); statDialInstances=[];
   wrap.innerHTML = `<div class="stat-grid">`+secTags.map((t,i)=>{
-    const v=latest[t.id]; const st=v!=null?tagStatus(t,v):null;
+    const v=latest[t.id]; 
+    const isNonNumeric = t.type==="text" || t.type==="select" || t.type==="motor";
+    const st=(!isNonNumeric && v!=null)?tagStatus(t,v):null;
     const pillClass = st==="high"?"pill-high":st==="low"?"pill-low":"pill-ok";
     const pillText = st==="high"?"HIGH":st==="low"?"LOW":"OK";
-    const hasRange = t.min!=null || t.max!=null;
-    const metaLine = v!=null && statMode==="avg" ? `<div class="mini" style="text-align:center">${meta[t.id]||""}</div>` : "";
+    const hasRange = !isNonNumeric && (t.min!=null || t.max!=null);
+    const metaLine = v!=null && statMode==="avg" && !isNonNumeric ? `<div class="mini" style="text-align:center">${meta[t.id]||""}</div>` : "";
+    const isSpare = v==="Spare";
     return `<div class="stat-card">
       <div class="stat-name">${t.name}</div>
-      ${hasRange ? `<canvas id="dial_${t.id}" width="120" height="72" style="display:block;margin:0 auto"></canvas>` : ""}
-      <div class="stat-val" style="text-align:center">${v!=null?v:"—"} <span style="font-size:10px;color:var(--muted)">${t.unit}</span></div>
+      ${hasRange ? `<canvas id="dial_${t.id}" width="160" height="100" style="display:block;margin:0 auto"></canvas>` : ""}
+      <div class="stat-val" style="text-align:center;font-size:${isNonNumeric?'14':'18'}px;font-weight:800;color:${isSpare?'#90a4ae':st==="high"||st==="low"?"#c62828":isNonNumeric?"#0d47a1":"#00695c"}">${v!=null?v:"—"} <span style="font-size:10px;color:var(--muted)">${t.unit}</span></div>
       ${metaLine}
-      <div class="stat-range" style="text-align:center">${rangeText(t)}</div>
-      <div style="text-align:center">${v!=null?`<span class="pill ${pillClass}">${pillText}</span>`:""}</div>
+      ${!isNonNumeric?`<div class="stat-range" style="text-align:center">${rangeText(t)}</div>`:""}
+      <div style="text-align:center">${(!isNonNumeric && v!=null)?`<span class="pill ${pillClass}">${pillText}</span>`:""}</div>
     </div>`;
   }).join("")+`</div>`;
 
-  // Draw gauge dials after DOM insertion
+  // Draw SCADA-style professional gauge dials
   secTags.forEach(t=>{
-    if(t.min==null && t.max==null) return; // no dial for pure log-only tags
+    if(t.min==null && t.max==null) return;
     const canvas=document.getElementById("dial_"+t.id); if(!canvas) return;
     const v=latest[t.id];
-    const visMin = 0;
-    const visMax = t.max!=null ? t.max*1.15 : (t.min!=null ? t.min*1.6 : 10);
-    let pct = 0, color = "#c7ccd6";
-    if(v!=null){
-      pct = Math.max(0, Math.min(100, ((v-visMin)/(visMax-visMin))*100));
-      const st = tagStatus(t,v);
-      color = (st==="high"||st==="low") ? "#e63946" : "#2d6a4f";
-    }
-    const ctx=canvas.getContext("2d");
-    const c = new Chart(ctx,{type:"doughnut",
-      data:{datasets:[{data:[pct,100-pct],backgroundColor:[color,"#eef0f7"],borderWidth:0}]},
-      options:{circumference:180,rotation:270,cutout:"70%",plugins:{legend:{display:false},tooltip:{enabled:false}},responsive:false}});
-    statDialInstances.push(c);
+    drawSCADAGauge(canvas, t, v);
   });
 }
+
+function drawSCADAGauge(canvas, tag, value){
+  const ctx = canvas.getContext("2d");
+  const W = canvas.width, H = canvas.height;
+  const cx = W/2, cy = H-14;
+  const R = Math.min(W, H*1.8) * 0.42;
+  ctx.clearRect(0,0,W,H);
+
+  const startAngle = Math.PI; // 180°
+  const endAngle = 2*Math.PI; // 360° (full semicircle)
+  const totalAngle = Math.PI;
+
+  // Calculate display range
+  const hasMin = tag.min != null;
+  const hasMax = tag.max != null;
+  const visMin = hasMin ? Math.max(0, tag.min * 0.7) : 0;
+  const visMax = hasMax ? tag.max * 1.25 : (hasMin ? tag.min * 2 : 100);
+
+  // Draw colored arc zones
+  function drawArc(from, to, color, width){
+    const a1 = startAngle + (from/(visMax-visMin)) * totalAngle;
+    const a2 = startAngle + (to/(visMax-visMin)) * totalAngle;
+    ctx.beginPath();
+    ctx.arc(cx, cy, R, a1, a2);
+    ctx.strokeStyle = color;
+    ctx.lineWidth = width;
+    ctx.lineCap = "butt";
+    ctx.stroke();
+  }
+
+  // Background arc (gray)
+  ctx.beginPath();
+  ctx.arc(cx, cy, R, startAngle, endAngle);
+  ctx.strokeStyle = "#e0e0e0";
+  ctx.lineWidth = 18;
+  ctx.stroke();
+
+  // Color zones
+  if(hasMin && hasMax){
+    // Low zone (red) - below min
+    drawArc(visMin-visMin, tag.min-visMin, "#ef5350", 18);
+    // Normal zone (green) - between min and max
+    drawArc(tag.min-visMin, tag.max-visMin, "#26a69a", 18);
+    // High zone (red) - above max
+    drawArc(tag.max-visMin, visMax-visMin, "#ef5350", 18);
+  } else if(hasMax){
+    // Only max — green below, red above
+    drawArc(0, tag.max-visMin, "#26a69a", 18);
+    drawArc(tag.max-visMin, visMax-visMin, "#ef5350", 18);
+  } else if(hasMin){
+    // Only min — red below, green above
+    drawArc(0, tag.min-visMin, "#ef5350", 18);
+    drawArc(tag.min-visMin, visMax-visMin, "#26a69a", 18);
+  }
+
+  // Warning zone near limits (yellow band)
+  if(hasMax){
+    const warnStart = (tag.max - (visMax-visMin)*0.08) - visMin;
+    const warnEnd = tag.max - visMin;
+    if(warnStart > 0) drawArc(warnStart, warnEnd, "#ffa726", 18);
+  }
+  if(hasMin){
+    const warnEnd = (tag.min + (visMax-visMin)*0.08) - visMin;
+    drawArc(tag.min-visMin, Math.min(warnEnd, hasMax?tag.max-visMin:visMax-visMin), "#ffa726", 18);
+  }
+
+  // Inner ring highlight
+  ctx.beginPath();
+  ctx.arc(cx, cy, R-10, startAngle, endAngle);
+  ctx.strokeStyle = "rgba(255,255,255,0.15)";
+  ctx.lineWidth = 6;
+  ctx.stroke();
+
+  // Tick marks
+  for(let i=0; i<=10; i++){
+    const ang = startAngle + (i/10)*totalAngle;
+    const isMajor = i%2===0;
+    const r1 = R + (isMajor ? 6 : 3);
+    const r2 = R - 22;
+    ctx.beginPath();
+    ctx.moveTo(cx + Math.cos(ang)*r2, cy + Math.sin(ang)*r2);
+    ctx.lineTo(cx + Math.cos(ang)*r1, cy + Math.sin(ang)*r1);
+    ctx.strokeStyle = isMajor ? "#546e7a" : "#90a4ae";
+    ctx.lineWidth = isMajor ? 2 : 1;
+    ctx.stroke();
+
+    // Major tick labels
+    if(isMajor){
+      const lv = visMin + (i/10)*(visMax-visMin);
+      const lr = R + 16;
+      ctx.fillStyle = "#546e7a";
+      ctx.font = "bold 7px system-ui";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(lv>=1000?(lv/1000).toFixed(1)+"k":lv%1===0?lv:lv.toFixed(1),
+        cx + Math.cos(ang)*lr, cy + Math.sin(ang)*lr);
+    }
+  }
+
+  // Needle
+  if(value != null){
+    const pct = Math.max(0, Math.min(1, (value-visMin)/(visMax-visMin)));
+    const needleAngle = startAngle + pct * totalAngle;
+    const needleLen = R - 8;
+    const st = tagStatus(tag, value);
+    const needleColor = (st==="high"||st==="low") ? "#c62828" : "#1a237e";
+
+    // Needle shadow
+    ctx.save();
+    ctx.shadowColor = "rgba(0,0,0,0.3)";
+    ctx.shadowBlur = 4;
+
+    // Needle body
+    ctx.beginPath();
+    ctx.moveTo(cx - Math.cos(needleAngle)*12, cy - Math.sin(needleAngle)*12);
+    ctx.lineTo(cx + Math.cos(needleAngle)*needleLen, cy + Math.sin(needleAngle)*needleLen);
+    ctx.strokeStyle = needleColor;
+    ctx.lineWidth = 3;
+    ctx.lineCap = "round";
+    ctx.stroke();
+    ctx.restore();
+
+    // Center pivot circle
+    ctx.beginPath();
+    ctx.arc(cx, cy, 7, 0, 2*Math.PI);
+    ctx.fillStyle = needleColor;
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(cx, cy, 4, 0, 2*Math.PI);
+    ctx.fillStyle = "#fff";
+    ctx.fill();
+  } else {
+    // No value — center dot only
+    ctx.beginPath();
+    ctx.arc(cx, cy, 6, 0, 2*Math.PI);
+    ctx.fillStyle = "#90a4ae";
+    ctx.fill();
+  }
+
+  // Min/Max labels at bottom
+  if(hasMin){
+    ctx.fillStyle = "#546e7a";
+    ctx.font = "bold 8px system-ui";
+    ctx.textAlign = "left";
+    ctx.fillText("MIN:"+tag.min, 2, H-2);
+  }
+  if(hasMax){
+    ctx.fillStyle = "#546e7a";
+    ctx.font = "bold 8px system-ui";
+    ctx.textAlign = "right";
+    ctx.fillText("MAX:"+tag.max, W-2, H-2);
+  }
+}
+
 
 // ══ MULTI-TAG BAR COMPARISON ══
 let barChartInstance=null;
@@ -11994,6 +12276,94 @@ function downloadCsvTemplate(){
   const csv = [hdrs.join(","), exampleRow.map(v=>`"${v}"`).join(",")].join("\n");
   triggerDownload(csv,"CCP_Import_Template.csv");
 }
+// ══ IMPORT FILE (CSV or Excel) ══
+function importFile(){
+  const fileInput = document.getElementById("import_csv_file");
+  const statusEl = document.getElementById("import_status");
+  if(!fileInput.files.length){ toast("⚠️ Choose a CSV or Excel file first"); return; }
+  const file = fileInput.files[0];
+  const name = file.name.toLowerCase();
+  statusEl.textContent = "⏳ Reading file...";
+
+  if(name.endsWith(".xlsx") || name.endsWith(".xls")){
+    // Excel file — use SheetJS
+    if(!window.XLSX){ toast("⚠️ Excel reader not loaded — try CSV instead"); return; }
+    const reader = new FileReader();
+    reader.onload = function(e){
+      try{
+        const wb = XLSX.read(e.target.result, {type:"array"});
+        const ws = wb.Sheets[wb.SheetNames[0]]; // first sheet
+        const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:""});
+        if(!rows.length){ statusEl.textContent="⚠️ Empty file"; return; }
+        // Convert to same format as CSV (array of objects using first row as headers)
+        const headers = rows[0].map(h=>String(h).trim());
+        const data = rows.slice(1).map(row=>{
+          const obj={};
+          headers.forEach((h,i)=>{ obj[h]=String(row[i]||"").trim(); });
+          return obj;
+        }).filter(row=>Object.values(row).some(v=>v!==""));
+        processImportData(data, statusEl);
+      } catch(err){
+        statusEl.textContent="❌ Error reading Excel: "+err.message;
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  } else {
+    // CSV file — use PapaParse
+    importCsvData();
+  }
+}
+
+function processImportData(data, statusEl){
+  const _importRows = [];
+  let imported=0, skipped=0, skipReasons=[];
+  const fileInput = document.getElementById("import_csv_file");
+  data.forEach((row,i)=>{
+    const date = (row["Date"]||"").trim();
+    const hour = (row["Hour"]||"").trim().padStart(4,"0");
+    const operator = (row["Operator"]||"").trim();
+    if(!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)){ skipped++; skipReasons.push(`Row ${i+2}: invalid/missing date`); return; }
+    if(!HOURS.includes(hour)){ skipped++; skipReasons.push(`Row ${i+2}: invalid hour "${row["Hour"]}"`); return; }
+    if(!operator){ skipped++; skipReasons.push(`Row ${i+2}: missing operator name`); return; }
+    const readings={};
+    TAGS.forEach(t=>{
+      const raw = row[t.name];
+      if(raw!==undefined && raw!==null && String(raw).trim()!==""){
+        const v=parseFloat(raw);
+        if(!isNaN(v)) readings[t.id]=v;
+      }
+    });
+    if(!Object.keys(readings).length){ skipped++; skipReasons.push(`Row ${i+2}: no readable tag values`); return; }
+    const shift = shiftForHour(hour);
+    const alertTags = TAGS.filter(t=>readings[t.id]!==undefined && (tagStatus(t,readings[t.id])==="high"||tagStatus(t,readings[t.id])==="low")).map(t=>t.id);
+    const existingIdx = entries.findIndex(e=>e.date===date && e.hour===hour && e.operator===operator);
+    const entry = {
+      id: existingIdx>=0?entries[existingIdx].id:entryIdSeq++,
+      date, hour, shift, operator, readings,
+      remarks: (row["Remarks"]||"").trim(),
+      alertTags, qrScannedAt:null, signature:null,
+      status:"Pending Review", imported:true,
+      reviewedBy: null, reviewedAt: null,
+      createdAt: new Date().toISOString(),
+    };
+    if(existingIdx>=0){ entries[existingIdx]=entry; } else { entries.unshift(entry); }
+    _importRows.push({date:entry.date,hour:entry.hour,shift:entry.shift,operator:entry.operator,readings:entry.readings,alert_tags:entry.alertTags,remarks:entry.remarks,status:'Pending Review',reviewed_by:null,reviewed_at:null,imported:true});
+    imported++;
+  });
+  statusEl.innerHTML = `✅ Imported ${imported} row(s).` + (skipped?` ⚠️ Skipped ${skipped} row(s).`:"");
+  if(skipReasons.length){
+    statusEl.innerHTML += `<br><span style="color:var(--alert)">${skipReasons.slice(0,5).join("<br>")}</span>` + (skipReasons.length>5?`<br>...and ${skipReasons.length-5} more`:"");
+  }
+  log_audit(currentUser,"📥 Imported historical data",`${imported} row(s) imported, ${skipped} skipped — by ${currentUser} at ${new Date().toLocaleString('en-IN')}`);
+  if(_importRows.length){ 
+    // Add importedBy field to each row
+    _importRows.forEach(r=>r.imported_by=currentUser);
+    sb.from('hourly_entries').upsert(_importRows,{onConflict:'date,hour,operator'}).then(({error})=>{ if(error) showCloudError('Import cloud save partial error: '+error.message); else hideCloudError(); }).catch(e=>showCloudError('Import cloud save failed: '+e.message)); 
+  }
+  toast(`✅ Imported ${imported} row(s)`+(skipped?`, ${skipped} skipped`:""));
+  if(fileInput) fileInput.value="";
+}
+
 function importCsvData(){
   const fileInput = document.getElementById("import_csv_file");
   const statusEl = document.getElementById("import_status");
@@ -12001,59 +12371,47 @@ function importCsvData(){
   if(!window.Papa){ toast("⚠️ CSV parser not available"); return; }
   const file = fileInput.files[0];
   statusEl.textContent = "⏳ Parsing...";
-  const _importRows = [];
   Papa.parse(file, {
     header: true,
     skipEmptyLines: true,
     dynamicTyping: false,
     complete: function(results){
-      let imported=0, skipped=0, skipReasons=[];
-      const nameToTag = {}; TAGS.forEach(t=>nameToTag[t.name]=t);
-      results.data.forEach((row,i)=>{
-        const date = (row["Date"]||"").trim();
-        const hour = (row["Hour"]||"").trim().padStart(4,"0");
-        const operator = (row["Operator"]||"").trim();
-        if(!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)){ skipped++; skipReasons.push(`Row ${i+2}: invalid/missing date`); return; }
-        if(!HOURS.includes(hour)){ skipped++; skipReasons.push(`Row ${i+2}: invalid hour "${row["Hour"]}"`); return; }
-        if(!operator){ skipped++; skipReasons.push(`Row ${i+2}: missing operator name`); return; }
-        const readings={};
-        TAGS.forEach(t=>{
-          const raw = row[t.name];
-          if(raw!==undefined && raw!==null && String(raw).trim()!==""){
-            const v=parseFloat(raw);
-            if(!isNaN(v)) readings[t.id]=v;
-          }
-        });
-        if(!Object.keys(readings).length){ skipped++; skipReasons.push(`Row ${i+2}: no readable tag values`); return; }
-        const shift = shiftForHour(hour);
-        const alertTags = TAGS.filter(t=>readings[t.id]!==undefined && (tagStatus(t,readings[t.id])==="high"||tagStatus(t,readings[t.id])==="low")).map(t=>t.id);
-        const existingIdx = entries.findIndex(e=>e.date===date && e.hour===hour && e.operator===operator);
-        const entry = {
-          id: existingIdx>=0?entries[existingIdx].id:entryIdSeq++,
-          date, hour, shift, operator, readings,
-          remarks: (row["Remarks"]||"").trim(),
-          alertTags, qrScannedAt:null, signature:null,
-          status:"Reviewed", imported:true,
-          reviewedBy: currentUser, reviewedAt: new Date().toISOString(),
-          createdAt: new Date().toISOString(),
-        };
-        if(existingIdx>=0){ entries[existingIdx]=entry; } else { entries.unshift(entry); }
-        _importRows.push({date:entry.date,hour:entry.hour,shift:entry.shift,operator:entry.operator,readings:entry.readings,alert_tags:entry.alertTags,remarks:entry.remarks,status:'Reviewed',reviewed_by:currentUser,reviewed_at:new Date().toISOString(),imported:true});
-        imported++;
-      });
-      statusEl.innerHTML = `✅ Imported ${imported} row(s).` + (skipped?` ⚠️ Skipped ${skipped} row(s).`:"");
-      if(skipReasons.length){
-        statusEl.innerHTML += `<br><span style="color:var(--alert)">${skipReasons.slice(0,5).join("<br>")}</span>` + (skipReasons.length>5?`<br>...and ${skipReasons.length-5} more`:"");
-      }
-      log_audit(currentUser,"Imported historical CSV",`${imported} row(s) imported, ${skipped} skipped`);
-      if(_importRows.length){ sb.from('hourly_entries').upsert(_importRows,{onConflict:'date,hour,operator'}).then(({error})=>{ if(error) showCloudError('Import cloud save partial error: '+error.message); else hideCloudError(); }).catch(e=>showCloudError('Import cloud save failed: '+e.message)); }
-      toast(`✅ Imported ${imported} historical row(s)`+(skipped?`, ${skipped} skipped`:""));
-      fileInput.value="";
+      processImportData(results.data, statusEl);
     },
     error: function(err){
       statusEl.textContent="⚠️ Could not parse file: "+err.message;
     }
   });
+}
+
+async function clearAllData(){
+  const confirm = document.getElementById("clear_confirm_inp").value.trim();
+  if(confirm !== "CONFIRM DELETE"){
+    toast("⚠️ Type CONFIRM DELETE exactly to proceed");
+    return;
+  }
+  toast("⏳ Clearing all data...");
+  try{
+    // Delete all entries
+    await sb.from('hourly_entries').eq('id', 'id').update({status:'deleted'}).catch(()=>{});
+    const {error:e1} = await fetch(SUPABASE_URL+"/rest/v1/hourly_entries?id=gte.0",{
+      method:"DELETE", headers:_sbHeaders()
+    }).then(r=>r.ok?{error:null}:{error:{message:'failed'}});
+    // Delete audit log
+    await fetch(SUPABASE_URL+"/rest/v1/audit_log?id=gte.0",{
+      method:"DELETE", headers:_sbHeaders()
+    });
+    // Clear local cache
+    entries = [];
+    auditLog = [];
+    incidents = [];
+    document.getElementById("clear_confirm_inp").value = "";
+    await loadFromSupabase();
+    toast("✅ All data cleared — fresh start ready!");
+    log_audit(currentUser, "🗑️ CLEARED ALL DATA", "Admin cleared all entries and audit log");
+  } catch(err){
+    toast("❌ Error clearing data: " + err.message);
+  }
 }
 
 function renderAdmin(){
@@ -12100,6 +12458,41 @@ async function adminResetPass(){
   log_audit(currentUser,"Password reset","For "+person);
   toast("✅ Password reset for "+person);
   document.getElementById("reset_new_pass").value="";
+}
+</script>
+<script>
+// PWA Service Worker Registration
+if('serviceWorker' in navigator){
+  window.addEventListener('load', ()=>{
+    navigator.serviceWorker.register('sw.js').then(reg=>{
+      console.log('PWA service worker registered');
+    }).catch(err=>console.log('SW registration failed', err));
+  });
+}
+// PWA Install Prompt
+let deferredPrompt;
+window.addEventListener('beforeinstallprompt', (e)=>{
+  e.preventDefault();
+  deferredPrompt = e;
+  // Show a small install hint if not already installed
+  if(!window.matchMedia('(display-mode: standalone)').matches){
+    setTimeout(()=>{
+      const hint = document.createElement('div');
+      hint.id = 'pwa_install_hint';
+      hint.style.cssText = 'position:fixed;bottom:80px;left:14px;right:14px;background:linear-gradient(135deg,#0a1628,#0d47a1);color:#fff;padding:12px 16px;border-radius:12px;z-index:9998;box-shadow:0 4px 16px rgba(0,0,0,.3);display:flex;align-items:center;justify-content:space-between;font-size:13px';
+      hint.innerHTML = `<span>📱 Install CCP Logbook as an app</span><span><button onclick="installPWA()" style="background:#00838f;color:#fff;border:none;padding:6px 14px;border-radius:8px;font-weight:700;margin-right:6px;cursor:pointer">Install</button><button onclick="document.getElementById('pwa_install_hint').remove()" style="background:transparent;color:rgba(255,255,255,.6);border:none;cursor:pointer">✕</button></span>`;
+      document.body.appendChild(hint);
+    }, 3000);
+  }
+});
+function installPWA(){
+  if(deferredPrompt){
+    deferredPrompt.prompt();
+    deferredPrompt.userChoice.then(()=>{
+      deferredPrompt = null;
+      document.getElementById('pwa_install_hint')?.remove();
+    });
+  }
 }
 </script>
 </body>
