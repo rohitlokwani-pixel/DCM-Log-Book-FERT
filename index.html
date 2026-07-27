@@ -10335,22 +10335,19 @@ canvas.sigpad{width:100%;height:120px;border:1.5px solid var(--border);border-ra
 <!-- ENTRY -->
 <div class="page" id="page_entry">
   <div class="card">
-    <div class="ct">🕐 Select Hour to Log</div>
+    <div class="ct">🕐 Reading Details (auto-captured at scan)</div>
     <div class="row2" style="margin-bottom:9px">
-      <div><label class="lbl">Date</label><input type="date" id="e_date" onchange="onEntryContextChange()"></div>
-      <div><label class="lbl">Hour</label><select id="e_hour" onchange="onEntryContextChange()"></select></div>
+      <div><label class="lbl">Date</label><input type="text" id="e_date_display" style="background:#f0f4ff;color:var(--blue);font-weight:700" readonly placeholder="— scan to set —"><input type="hidden" id="e_date"></div>
+      <div><label class="lbl">Hour</label><input type="text" id="e_hour_display" style="background:#f0f4ff;color:var(--blue);font-weight:700" readonly placeholder="— scan to set —"><input type="hidden" id="e_hour"></div>
     </div>
     <div id="shift_indicator" style="font-size:11px;font-weight:700;color:var(--blue);margin-bottom:9px"></div>
     <label class="lbl">Operator Name</label>
     <input type="text" id="e_operator_name" placeholder="Operator name" style="margin-bottom:9px;background:#f0f4ff;color:var(--blue);font-weight:700" readonly>
     <div class="row2" style="margin-bottom:9px">
       <div>
-        <label class="lbl">Shift</label>
-        <select id="e_shift_select">
-          <option value="A Shift">A Shift (0630–1430)</option>
-          <option value="B Shift">B Shift (1430–2230)</option>
-          <option value="C Shift">C Shift (2230–0630)</option>
-        </select>
+        <label class="lbl">Shift (auto)</label>
+        <input type="text" id="e_shift_display" style="background:#f0f4ff;color:var(--blue);font-weight:700" readonly placeholder="— scan to set —">
+        <input type="hidden" id="e_shift_select">
       </div>
       <div>
         <label class="lbl">Area / Unit</label>
@@ -10450,9 +10447,9 @@ canvas.sigpad{width:100%;height:120px;border:1.5px solid var(--border);border-ra
     <label class="lbl">Shift</label>
     <select id="bar_shift_filter" onchange="renderBarChart()" style="margin-bottom:8px">
       <option value="All">All Shifts (averaged)</option>
-      <option value="A Shift">A Shift only (0630–1430)</option>
-      <option value="B Shift">B Shift only (1430–2230)</option>
-      <option value="C Shift">C Shift only (2230–0630)</option>
+      <option value="A Shift">A Shift only (0700–1400)</option>
+      <option value="B Shift">B Shift only (1500–2200)</option>
+      <option value="C Shift">C Shift only (2300–0600)</option>
     </select>
     <div class="row2" style="margin-bottom:8px">
       <div><label class="lbl">From</label><input type="date" id="bar_from" onchange="onBarRangeChange()"></div>
@@ -10729,13 +10726,14 @@ const TAGS = [
   {id:"LEAK_MAIN_HP", section:"CCP_FIELD", name:"Seal Leakage — Main Pump (HP Side)", unit:"", type:"text", min:null, max:null},
 ];
 
-const HOURS = ["0630","0730","0830","0930","1030","1130","1230","1330","1430","1530","1630","1730","1830","1930","2030","2130","2230","2330","0030","0130","0230","0330","0430","0530"];
+const HOURS = ["0700","0800","0900","1000","1100","1200","1300","1400","1500","1600","1700","1800","1900","2000","2100","2200","2300","0000","0100","0200","0300","0400","0500","0600"];
 
 function shiftForHour(h){
   const n = parseInt(h);
-  if(n>=630 && n<1430) return "A Shift";
-  if(n>=1430 && n<2230) return "B Shift";
-  return "C Shift"; // 2230-0629
+  // A Shift 0700-1400, B Shift 1500-2200, C Shift 2300-0600
+  if(n>=700 && n<=1400) return "A Shift";
+  if(n>=1500 && n<=2200) return "B Shift";
+  return "C Shift"; // 2300, 0000-0600
 }
 function rangeText(tag){
   if(tag.min!=null && tag.max!=null) return tag.min+"–"+tag.max+" "+tag.unit;
@@ -10916,21 +10914,12 @@ function switchTab(key){
 }
 
 function initEntryDefaults(){
-  const now=new Date();
-  document.getElementById("e_date").value = toDateStr(now);
-  const hourSel=document.getElementById("e_hour");
-  hourSel.innerHTML="";
-
-  HOURS.forEach(h=>hourSel.add(new Option(h.slice(0,2)+":"+h.slice(2)+" hrs",h)));
-  const curHourStr = String(now.getHours()).padStart(2,"0")+"00";
-  hourSel.value = HOURS.includes(curHourStr)?curHourStr:HOURS[0];
-
+  // Date/hour/shift are now captured from QR scan, not selectable here.
   // Pre-fill operator name from login
   const nameField = document.getElementById("e_operator_name");
   if(nameField && currentUser && currentUser!=="Shift Incharge (shared login)" && currentUser!=="Admin"){
     nameField.value = currentUser;
   }
-  onEntryContextChange();
 }
 
 // ══ ENTRY FLOW ══
@@ -11044,42 +11033,35 @@ function manualVerify(){
 }
 function simulateQrScan(){ onQrSuccess(true); }
 function onQrSuccess(simulated){
-  const {key}=currentShiftKey();
-  qrScannedShifts[key]=true;
-  // Store scan time and auto-detected shift
+  // Capture the real scan timestamp — this is the tamper-proof record
   const scanTime = new Date();
   const scanDate = toDateStr(scanTime);
-  const scanShift = shiftForHour(String(scanTime.getHours()).padStart(2,"0")+"00");
-  qrScannedShifts[scanDate+"_meta"] = {date: scanDate, shift: scanShift, time: scanTime.toISOString()};
+  // Round to nearest logging hour (on-the-hour). Use current hour.
+  const scanHour = String(scanTime.getHours()).padStart(2,"0")+"00";
+  const scanShift = shiftForHour(scanHour);
+  const key = scanDate;
+  qrScannedShifts[key]=true;
+  qrScannedShifts[scanDate+"_meta"] = {date: scanDate, shift: scanShift, hour: scanHour, time: scanTime.toISOString()};
 
   if(qrStream){ qrStream.getTracks().forEach(t=>t.stop()); }
   document.getElementById("qr_video").style.display="none";
   document.getElementById("qr_switch_btn").style.display="none";
   document.getElementById("qr_box").classList.add("scanned");
   document.getElementById("qr_status").textContent="✅ Verified"+(simulated?" (manual)":" (QR scan)")+" at "+scanTime.toLocaleTimeString()+` — ${scanShift}`;
-  log_audit(currentUser,"QR scan (shift start)",key+(simulated?" [MANUAL VERIFICATION]":"")+" — "+scanShift+" at "+scanTime.toLocaleTimeString());
-  toast("✅ Shift verified — "+scanShift+" — sign to unlock hourly entry");
+  log_audit(currentUser,"QR scan",key+(simulated?" [MANUAL]":"")+" — "+scanShift+" hour "+scanHour+" at "+scanTime.toLocaleTimeString());
+  toast("✅ Verified — "+scanShift+" · "+scanHour.slice(0,2)+":"+scanHour.slice(2)+" — sign to continue");
 
-  // Lock date and shift to scan time values
+  // Set hidden values (used on submit) and display fields (shown to operator, read-only)
   document.getElementById("e_date").value = scanDate;
-  document.getElementById("e_date").readOnly = true;
-  document.getElementById("e_date").style.background = "#f0f4ff";
-  document.getElementById("e_date").style.color = "#0d47a1";
-  document.getElementById("e_date").style.fontWeight = "700";
+  document.getElementById("e_hour").value = scanHour;
+  document.getElementById("e_shift_select").value = scanShift;
+  const dd = new Date(scanDate);
+  document.getElementById("e_date_display").value = dd.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});
+  document.getElementById("e_hour_display").value = scanHour.slice(0,2)+":"+scanHour.slice(2)+" hrs";
+  document.getElementById("e_shift_display").value = scanShift;
+  document.getElementById("shift_indicator").textContent = "🔒 Captured from scan: "+scanShift+" · "+scanTime.toLocaleTimeString();
 
-  const shiftSel = document.getElementById("e_shift_select");
-  if(shiftSel){
-    shiftSel.value = scanShift;
-    shiftSel.disabled = true;
-    shiftSel.style.background = "#f0f4ff";
-    shiftSel.style.color = "#0d47a1";
-    shiftSel.style.fontWeight = "700";
-  }
-
-  // Update shift indicator
-  document.getElementById("shift_indicator").textContent = "This hour falls in: "+scanShift+" (locked from QR scan)";
-
-  // Explicitly hide QR card and show signature card
+  // Show signature card
   document.getElementById("qr_card").style.display="none";
   document.getElementById("sig_card").style.display="block";
   document.getElementById("entry_sections").style.display="none";
@@ -11343,10 +11325,24 @@ async function submitHourEntry(){
     toast("✅ Hour logged successfully");
   }
   document.getElementById("e_rem").value="";
-  // advance to next hour automatically for convenience
-  const hourSel=document.getElementById("e_hour");
-  const idx=HOURS.indexOf(hour);
-  if(idx<HOURS.length-1){ hourSel.value=HOURS[idx+1]; onEntryContextChange(); }
+  // After submit, require a fresh scan for the next hour reading (tamper-proof)
+  const key = date;
+  qrScannedShifts[key] = false;
+  signedShifts[key] = false;
+  document.getElementById("entry_sections").style.display="none";
+  document.getElementById("sig_card").style.display="none";
+  document.getElementById("qr_card").style.display="block";
+  document.getElementById("qr_box").classList.remove("scanned");
+  document.getElementById("qr_status").textContent="";
+  // Clear the captured time displays
+  document.getElementById("e_date_display").value="";
+  document.getElementById("e_hour_display").value="";
+  document.getElementById("e_shift_display").value="";
+  document.getElementById("shift_indicator").textContent="";
+  document.getElementById("e_date").value="";
+  document.getElementById("e_hour").value="";
+  window.scrollTo({top:0, behavior:"smooth"});
+  toast("✅ Logged! Scan again for the next hour reading");
 }
 
 // ══ INCIDENT ══
@@ -12272,7 +12268,7 @@ function csvHeaders(){
 }
 function downloadCsvTemplate(){
   const hdrs = csvHeaders();
-  const exampleRow = ["2026-07-01","0630","A Shift","Rohit",...TAGS.map(t=>"")];
+  const exampleRow = ["2026-07-01","0700","A Shift","Rohit",...TAGS.map(t=>"")];
   const csv = [hdrs.join(","), exampleRow.map(v=>`"${v}"`).join(",")].join("\n");
   triggerDownload(csv,"CCP_Import_Template.csv");
 }
