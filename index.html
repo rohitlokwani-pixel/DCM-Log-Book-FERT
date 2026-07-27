@@ -12319,8 +12319,15 @@ function processImportData(data, statusEl){
   let imported=0, skipped=0, skipReasons=[];
   const fileInput = document.getElementById("import_csv_file");
   data.forEach((row,i)=>{
-    const date = (row["Date"]||"").trim();
-    const hour = (row["Hour"]||"").trim().padStart(4,"0");
+    let date = (row["Date"]||"").toString().trim();
+    // Normalize date to YYYY-MM-DD — accept DD-MM-YYYY, DD/MM/YYYY, YYYY-MM-DD, YYYY/MM/DD
+    date = date.replace(/\//g,"-");
+    let dm = date.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/); // DD-MM-YYYY
+    let ym = date.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/); // YYYY-MM-DD
+    if(dm){ date = dm[3]+"-"+dm[2].padStart(2,"0")+"-"+dm[1].padStart(2,"0"); }
+    else if(ym){ date = ym[1]+"-"+ym[2].padStart(2,"0")+"-"+ym[3].padStart(2,"0"); }
+    let hour = (row["Hour"]||"").toString().trim();
+    hour = hour.padStart(4,"0");
     const operator = (row["Operator"]||"").trim();
     if(!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)){ skipped++; skipReasons.push(`Row ${i+2}: invalid/missing date`); return; }
     if(!HOURS.includes(hour)){ skipped++; skipReasons.push(`Row ${i+2}: invalid hour "${row["Hour"]}"`); return; }
@@ -12461,12 +12468,12 @@ async function adminResetPass(){
 }
 </script>
 <script>
-// PWA Service Worker Registration
-if('serviceWorker' in navigator){
+// PWA Service Worker Registration — only on real hosting, fail silently
+if('serviceWorker' in navigator && location.protocol === 'https:' && !location.host.includes('claudeusercontent') && !location.host.includes('anthropic')){
   window.addEventListener('load', ()=>{
     navigator.serviceWorker.register('sw.js').then(reg=>{
-      console.log('PWA service worker registered');
-    }).catch(err=>console.log('SW registration failed', err));
+      console.log('PWA ready');
+    }).catch(()=>{ /* sw.js not present — ignore, PWA optional */ });
   });
 }
 // PWA Install Prompt
