@@ -11703,10 +11703,16 @@ function computeStatValues(){
     const toStr = document.getElementById("statavg_to").value || fromStr;
     const rangeEntries = visibleEntries().filter(e=>e.date>=fromStr && e.date<=toStr);
     TAGS.forEach(t=>{
-      const nums = rangeEntries.filter(e=>e.readings[t.id]!==undefined).map(e=>e.readings[t.id]);
-      if(nums.length){
-        vals[t.id] = +(nums.reduce((a,b)=>a+b,0)/nums.length).toFixed(2);
-        meta[t.id] = nums.length+" reading avg";
+      if(t.type==="text"||t.type==="select"||t.type==="motor"){
+        // Non-numeric — show most recent value in range, not average
+        const recent = rangeEntries.filter(e=>e.readings[t.id]!==undefined && e.readings[t.id]!=="");
+        if(recent.length){ vals[t.id]=recent[0].readings[t.id]; meta[t.id]="latest in range"; }
+      } else {
+        const nums = rangeEntries.filter(e=>e.readings[t.id]!==undefined && !isNaN(parseFloat(e.readings[t.id]))).map(e=>parseFloat(e.readings[t.id]));
+        if(nums.length){
+          vals[t.id] = +(nums.reduce((a,b)=>a+b,0)/nums.length).toFixed(2);
+          meta[t.id] = nums.length+" reading avg";
+        }
       }
     });
   }
@@ -11728,52 +11734,80 @@ function renderStatCards(){
   wrap.innerHTML = `<div class="stat-grid">`+secTags.map((t,i)=>{
     const v=latest[t.id]; 
     const isNonNumeric = t.type==="text" || t.type==="select" || t.type==="motor";
-    const st=(!isNonNumeric && v!=null)?tagStatus(t,v):null;
+    const st=(!isNonNumeric && v!=null && !isNaN(parseFloat(v)))?tagStatus(t,parseFloat(v)):null;
     const pillClass = st==="high"?"pill-high":st==="low"?"pill-low":"pill-ok";
     const pillText = st==="high"?"HIGH":st==="low"?"LOW":"OK";
     const hasRange = !isNonNumeric && (t.min!=null || t.max!=null);
     const metaLine = v!=null && statMode==="avg" && !isNonNumeric ? `<div class="mini" style="text-align:center">${meta[t.id]||""}</div>` : "";
     const isSpare = v==="Spare";
+
+    if(isNonNumeric){
+      // Text/select/motor — show a clear value chip, no gauge
+      const displayVal = (v!=null && v!=="") ? v : "—";
+      const chipColor = isSpare ? "#90a4ae" : "#00838f";
+      const chipBg = isSpare ? "#eceff1" : "#e0f7fa";
+      const icon = t.type==="motor" ? "⚙️" : t.type==="select" ? "🔀" : "📝";
+      return `<div class="stat-card" style="display:flex;flex-direction:column;justify-content:center;min-height:120px">
+        <div class="stat-name">${t.name}</div>
+        <div style="text-align:center;margin:12px 0">
+          <span style="display:inline-block;background:${chipBg};color:${chipColor};font-size:14px;font-weight:800;padding:8px 16px;border-radius:20px;border:2px solid ${chipColor}">${icon} ${displayVal} ${t.unit||""}</span>
+        </div>
+      </div>`;
+    }
+
     return `<div class="stat-card">
       <div class="stat-name">${t.name}</div>
-      ${hasRange ? `<canvas id="dial_${t.id}" width="160" height="100" style="display:block;margin:0 auto"></canvas>` : ""}
-      <div class="stat-val" style="text-align:center;font-size:${isNonNumeric?'14':'18'}px;font-weight:800;color:${isSpare?'#90a4ae':st==="high"||st==="low"?"#c62828":isNonNumeric?"#0d47a1":"#00695c"}">${v!=null?v:"—"} <span style="font-size:10px;color:var(--muted)">${t.unit}</span></div>
+      ${hasRange ? `<canvas id="dial_${t.id}" style="display:block;margin:0 auto"></canvas>` : ""}
+      <div class="stat-val" style="text-align:center;font-size:18px;font-weight:800;color:${st==="high"||st==="low"?"#c62828":"#00695c"}">${v!=null?v:"—"} <span style="font-size:10px;color:var(--muted)">${t.unit}</span></div>
       ${metaLine}
-      ${!isNonNumeric?`<div class="stat-range" style="text-align:center">${rangeText(t)}</div>`:""}
-      <div style="text-align:center">${(!isNonNumeric && v!=null)?`<span class="pill ${pillClass}">${pillText}</span>`:""}</div>
+      <div class="stat-range" style="text-align:center">${rangeText(t)}</div>
+      <div style="text-align:center">${v!=null?`<span class="pill ${pillClass}">${pillText}</span>`:""}</div>
     </div>`;
   }).join("")+`</div>`;
 
-  // Draw SCADA-style professional gauge dials
+  // Draw SCADA gauge dials (numeric tags only)
   secTags.forEach(t=>{
+    if(t.type==="text"||t.type==="select"||t.type==="motor") return;
     if(t.min==null && t.max==null) return;
     const canvas=document.getElementById("dial_"+t.id); if(!canvas) return;
     const v=latest[t.id];
-    drawSCADAGauge(canvas, t, v);
+    drawSCADAGauge(canvas, t, v!=null?parseFloat(v):null);
   });
 }
 
 function drawSCADAGauge(canvas, tag, value){
+  // Retina-sharp rendering
+  const dpr = window.devicePixelRatio || 2;
+  const cssW = 160, cssH = 100;
+  canvas.style.width = cssW+"px";
+  canvas.style.height = cssH+"px";
+  canvas.width = cssW*dpr;
+  canvas.height = cssH*dpr;
   const ctx = canvas.getContext("2d");
-  const W = canvas.width, H = canvas.height;
-  const cx = W/2, cy = H-14;
-  const R = Math.min(W, H*1.8) * 0.42;
+  ctx.scale(dpr, dpr);
+  const W = cssW, H = cssH;
+  const cx = W/2, cy = H-16;
+  const R = 46;
   ctx.clearRect(0,0,W,H);
 
-  const startAngle = Math.PI; // 180°
-  const endAngle = 2*Math.PI; // 360° (full semicircle)
+  const startAngle = Math.PI;
+  const endAngle = 2*Math.PI;
   const totalAngle = Math.PI;
 
-  // Calculate display range
   const hasMin = tag.min != null;
   const hasMax = tag.max != null;
-  const visMin = hasMin ? Math.max(0, tag.min * 0.7) : 0;
-  const visMax = hasMax ? tag.max * 1.25 : (hasMin ? tag.min * 2 : 100);
+  // Display range — expand to include actual value if it's out of the expected band
+  let visMin = hasMin ? Math.max(0, tag.min * 0.7) : 0;
+  let visMax = hasMax ? tag.max * 1.25 : (hasMin ? tag.min * 2 : 100);
+  if(value != null && !isNaN(value)){
+    if(value > visMax) visMax = value * 1.1;      // expand up for high readings
+    if(value < visMin) visMin = Math.max(0, value * 0.9); // expand down for low
+  }
+  const range = visMax - visMin;
 
-  // Draw colored arc zones
-  function drawArc(from, to, color, width){
-    const a1 = startAngle + (from/(visMax-visMin)) * totalAngle;
-    const a2 = startAngle + (to/(visMax-visMin)) * totalAngle;
+  function drawArc(fromV, toV, color, width){
+    const a1 = startAngle + ((fromV-visMin)/range) * totalAngle;
+    const a2 = startAngle + ((toV-visMin)/range) * totalAngle;
     ctx.beginPath();
     ctx.arc(cx, cy, R, a1, a2);
     ctx.strokeStyle = color;
@@ -11782,128 +11816,81 @@ function drawSCADAGauge(canvas, tag, value){
     ctx.stroke();
   }
 
-  // Background arc (gray)
+  // Background track
   ctx.beginPath();
   ctx.arc(cx, cy, R, startAngle, endAngle);
-  ctx.strokeStyle = "#e0e0e0";
-  ctx.lineWidth = 18;
+  ctx.strokeStyle = "#eceff1";
+  ctx.lineWidth = 15;
   ctx.stroke();
 
-  // Color zones
+  // VIBRANT color zones
+  const GREEN = "#00c853", RED = "#ff1744", AMBER = "#ffab00";
   if(hasMin && hasMax){
-    // Low zone (red) - below min
-    drawArc(visMin-visMin, tag.min-visMin, "#ef5350", 18);
-    // Normal zone (green) - between min and max
-    drawArc(tag.min-visMin, tag.max-visMin, "#26a69a", 18);
-    // High zone (red) - above max
-    drawArc(tag.max-visMin, visMax-visMin, "#ef5350", 18);
+    drawArc(visMin, tag.min, RED, 15);
+    drawArc(tag.min, tag.max, GREEN, 15);
+    drawArc(tag.max, visMax, RED, 15);
+    // amber warning bands just inside limits
+    const wb = range*0.06;
+    drawArc(tag.min, Math.min(tag.min+wb, tag.max), AMBER, 15);
+    drawArc(Math.max(tag.max-wb, tag.min), tag.max, AMBER, 15);
   } else if(hasMax){
-    // Only max — green below, red above
-    drawArc(0, tag.max-visMin, "#26a69a", 18);
-    drawArc(tag.max-visMin, visMax-visMin, "#ef5350", 18);
+    drawArc(visMin, tag.max, GREEN, 15);
+    drawArc(tag.max, visMax, RED, 15);
+    drawArc(Math.max(tag.max-range*0.06, visMin), tag.max, AMBER, 15);
   } else if(hasMin){
-    // Only min — red below, green above
-    drawArc(0, tag.min-visMin, "#ef5350", 18);
-    drawArc(tag.min-visMin, visMax-visMin, "#26a69a", 18);
+    drawArc(visMin, tag.min, RED, 15);
+    drawArc(tag.min, visMax, GREEN, 15);
+    drawArc(tag.min, tag.min+range*0.06, AMBER, 15);
   }
-
-  // Warning zone near limits (yellow band)
-  if(hasMax){
-    const warnStart = (tag.max - (visMax-visMin)*0.08) - visMin;
-    const warnEnd = tag.max - visMin;
-    if(warnStart > 0) drawArc(warnStart, warnEnd, "#ffa726", 18);
-  }
-  if(hasMin){
-    const warnEnd = (tag.min + (visMax-visMin)*0.08) - visMin;
-    drawArc(tag.min-visMin, Math.min(warnEnd, hasMax?tag.max-visMin:visMax-visMin), "#ffa726", 18);
-  }
-
-  // Inner ring highlight
-  ctx.beginPath();
-  ctx.arc(cx, cy, R-10, startAngle, endAngle);
-  ctx.strokeStyle = "rgba(255,255,255,0.15)";
-  ctx.lineWidth = 6;
-  ctx.stroke();
 
   // Tick marks
-  for(let i=0; i<=10; i++){
+  for(let i=0;i<=10;i++){
     const ang = startAngle + (i/10)*totalAngle;
-    const isMajor = i%2===0;
-    const r1 = R + (isMajor ? 6 : 3);
-    const r2 = R - 22;
+    const maj = i%2===0;
     ctx.beginPath();
-    ctx.moveTo(cx + Math.cos(ang)*r2, cy + Math.sin(ang)*r2);
-    ctx.lineTo(cx + Math.cos(ang)*r1, cy + Math.sin(ang)*r1);
-    ctx.strokeStyle = isMajor ? "#546e7a" : "#90a4ae";
-    ctx.lineWidth = isMajor ? 2 : 1;
+    ctx.moveTo(cx+Math.cos(ang)*(R-19), cy+Math.sin(ang)*(R-19));
+    ctx.lineTo(cx+Math.cos(ang)*(R+(maj?5:2)), cy+Math.sin(ang)*(R+(maj?5:2)));
+    ctx.strokeStyle = maj?"#455a64":"#b0bec5";
+    ctx.lineWidth = maj?1.5:0.8;
     ctx.stroke();
-
-    // Major tick labels
-    if(isMajor){
-      const lv = visMin + (i/10)*(visMax-visMin);
-      const lr = R + 16;
-      ctx.fillStyle = "#546e7a";
-      ctx.font = "bold 7px system-ui";
+    if(maj){
+      const lv = visMin + (i/10)*range;
+      const lr = R+13;
+      ctx.fillStyle = "#607d8b";
+      ctx.font = "600 7px system-ui";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.fillText(lv>=1000?(lv/1000).toFixed(1)+"k":lv%1===0?lv:lv.toFixed(1),
-        cx + Math.cos(ang)*lr, cy + Math.sin(ang)*lr);
+      ctx.fillText(lv>=1000?(lv/1000).toFixed(1)+"k":(lv%1===0?lv:lv.toFixed(0)), cx+Math.cos(ang)*lr, cy+Math.sin(ang)*lr);
     }
   }
 
   // Needle
-  if(value != null){
-    const pct = Math.max(0, Math.min(1, (value-visMin)/(visMax-visMin)));
-    const needleAngle = startAngle + pct * totalAngle;
-    const needleLen = R - 8;
+  if(value != null && !isNaN(value)){
+    const pct = Math.max(0, Math.min(1, (value-visMin)/range));
+    const na = startAngle + pct*totalAngle;
     const st = tagStatus(tag, value);
-    const needleColor = (st==="high"||st==="low") ? "#c62828" : "#1a237e";
-
-    // Needle shadow
+    const nc = (st==="high"||st==="low") ? "#d50000" : "#0d47a1";
     ctx.save();
-    ctx.shadowColor = "rgba(0,0,0,0.3)";
-    ctx.shadowBlur = 4;
-
-    // Needle body
+    ctx.shadowColor = "rgba(0,0,0,0.25)";
+    ctx.shadowBlur = 3;
     ctx.beginPath();
-    ctx.moveTo(cx - Math.cos(needleAngle)*12, cy - Math.sin(needleAngle)*12);
-    ctx.lineTo(cx + Math.cos(needleAngle)*needleLen, cy + Math.sin(needleAngle)*needleLen);
-    ctx.strokeStyle = needleColor;
-    ctx.lineWidth = 3;
+    ctx.moveTo(cx-Math.cos(na)*11, cy-Math.sin(na)*11);
+    ctx.lineTo(cx+Math.cos(na)*(R-4), cy+Math.sin(na)*(R-4));
+    ctx.strokeStyle = nc;
+    ctx.lineWidth = 2.5;
     ctx.lineCap = "round";
     ctx.stroke();
     ctx.restore();
-
-    // Center pivot circle
-    ctx.beginPath();
-    ctx.arc(cx, cy, 7, 0, 2*Math.PI);
-    ctx.fillStyle = needleColor;
-    ctx.fill();
-    ctx.beginPath();
-    ctx.arc(cx, cy, 4, 0, 2*Math.PI);
-    ctx.fillStyle = "#fff";
-    ctx.fill();
+    ctx.beginPath(); ctx.arc(cx,cy,7,0,2*Math.PI); ctx.fillStyle=nc; ctx.fill();
+    ctx.beginPath(); ctx.arc(cx,cy,3.5,0,2*Math.PI); ctx.fillStyle="#fff"; ctx.fill();
   } else {
-    // No value — center dot only
-    ctx.beginPath();
-    ctx.arc(cx, cy, 6, 0, 2*Math.PI);
-    ctx.fillStyle = "#90a4ae";
-    ctx.fill();
+    ctx.beginPath(); ctx.arc(cx,cy,6,0,2*Math.PI); ctx.fillStyle="#b0bec5"; ctx.fill();
   }
 
-  // Min/Max labels at bottom
-  if(hasMin){
-    ctx.fillStyle = "#546e7a";
-    ctx.font = "bold 8px system-ui";
-    ctx.textAlign = "left";
-    ctx.fillText("MIN:"+tag.min, 2, H-2);
-  }
-  if(hasMax){
-    ctx.fillStyle = "#546e7a";
-    ctx.font = "bold 8px system-ui";
-    ctx.textAlign = "right";
-    ctx.fillText("MAX:"+tag.max, W-2, H-2);
-  }
+  // Min/Max labels
+  ctx.font = "700 8px system-ui";
+  if(hasMin){ ctx.fillStyle="#607d8b"; ctx.textAlign="left"; ctx.fillText("MIN:"+tag.min, 2, H-2); }
+  if(hasMax){ ctx.fillStyle="#607d8b"; ctx.textAlign="right"; ctx.fillText("MAX:"+tag.max, W-2, H-2); }
 }
 
 
