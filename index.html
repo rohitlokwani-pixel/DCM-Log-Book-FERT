@@ -10599,7 +10599,7 @@ canvas.sigpad{width:100%;height:120px;border:1.5px solid var(--border);border-ra
 <div class="page" id="page_admin">
   <div class="as">
     <div class="at">📥 Import Historical Data (CSV or Excel)</div>
-    <p class="mini" style="margin-bottom:8px">For backfilling old paper log data already typed into a spreadsheet. Download the template first so columns match exactly — imported rows skip QR/signature verification and are clearly marked "Imported" everywhere they appear.</p>
+    <p class="mini" style="margin-bottom:8px">For backfilling old paper log data already typed into a spreadsheet. Download the template first so columns match exactly. <strong>Excel with multiple tabs (one date per tab) is supported</strong> — all tabs are read as long as each has a "Date" column. Imported rows skip QR/signature verification and are clearly marked "Imported" everywhere they appear.</p>
     <button class="btn btn-outline" onclick="downloadCsvTemplate()">📄 Download CSV Template</button>
     <label class="lbl">Choose CSV or Excel file (.csv / .xlsx)</label>
     <input type="file" id="import_csv_file" accept=".csv,.xlsx,.xls" style="margin-bottom:8px">
@@ -12276,17 +12276,26 @@ function importFile(){
     reader.onload = function(e){
       try{
         const wb = XLSX.read(e.target.result, {type:"array"});
-        const ws = wb.Sheets[wb.SheetNames[0]]; // first sheet
-        const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:""});
-        if(!rows.length){ statusEl.textContent="⚠️ Empty file"; return; }
-        // Convert to same format as CSV (array of objects using first row as headers)
-        const headers = rows[0].map(h=>String(h).trim());
-        const data = rows.slice(1).map(row=>{
-          const obj={};
-          headers.forEach((h,i)=>{ obj[h]=String(row[i]||"").trim(); });
-          return obj;
-        }).filter(row=>Object.values(row).some(v=>v!==""));
-        processImportData(data, statusEl);
+        // Read ALL tabs/sheets in the workbook, not just the first
+        let allData = [];
+        let tabsRead = 0;
+        wb.SheetNames.forEach(sheetName=>{
+          const ws = wb.Sheets[sheetName];
+          const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:""});
+          if(!rows.length) return;
+          const headers = rows[0].map(h=>String(h).trim());
+          // Only process tabs that have a "Date" column (skip empty/non-data tabs)
+          if(!headers.includes("Date")) return;
+          const tabData = rows.slice(1).map(row=>{
+            const obj={};
+            headers.forEach((h,i)=>{ obj[h]=String(row[i]||"").trim(); });
+            return obj;
+          }).filter(row=>Object.values(row).some(v=>v!==""));
+          if(tabData.length){ allData = allData.concat(tabData); tabsRead++; }
+        });
+        if(!allData.length){ statusEl.textContent="⚠️ No data found. Ensure each tab has a 'Date' column header."; return; }
+        statusEl.textContent = `⏳ Reading ${tabsRead} tab(s), ${allData.length} rows...`;
+        processImportData(allData, statusEl);
       } catch(err){
         statusEl.textContent="❌ Error reading Excel: "+err.message;
       }
