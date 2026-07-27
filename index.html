@@ -10737,9 +10737,9 @@ function shiftForHour(h){
   return "C Shift"; // 2300, 0000-0600
 }
 function rangeText(tag){
-  if(tag.min!=null && tag.max!=null) return tag.min+"–"+tag.max+" "+tag.unit;
-  if(tag.max!=null) return "≤"+tag.max+" "+tag.unit;
-  if(tag.min!=null) return "≥"+tag.min+" "+tag.unit;
+  if(tag.min!=null && tag.max!=null) return "Alarm: "+tag.min+"–"+tag.max+" "+tag.unit;
+  if(tag.max!=null) return "Alarm: ≤"+tag.max+" "+tag.unit;
+  if(tag.min!=null) return "Alarm: ≥"+tag.min+" "+tag.unit;
   return "log only ("+tag.unit+")";
 }
 function tagStatus(tag, val){
@@ -10794,7 +10794,7 @@ async function loadFromSupabase(){
     if(sData){
       const rec=Object.fromEntries(sData.map(r=>[r.key,r.value]));
       if(rec.recipients) settings.recipients=rec.recipients;
-      if(rec.ranges){ TAGS.forEach(t=>{ if(rec.ranges[t.id]){ t.min=rec.ranges[t.id].min; t.max=rec.ranges[t.id].max; settings.ranges[t.id]=rec.ranges[t.id]; } }); }
+      if(rec.ranges){ TAGS.forEach(t=>{ if(rec.ranges[t.id]){ t.min=rec.ranges[t.id].min; t.max=rec.ranges[t.id].max; t.rangeMin=rec.ranges[t.id].rangeMin; t.rangeMax=rec.ranges[t.id].rangeMax; t.alertEnabled=rec.ranges[t.id].alertEnabled; settings.ranges[t.id]=rec.ranges[t.id]; } }); }
     }
     supabaseReady=true;
     hideCloudError();
@@ -11797,14 +11797,16 @@ function drawSCADAGauge(canvas, tag, value){
   const endAngle = 2*Math.PI;
   const totalAngle = Math.PI;
 
-  const hasMin = tag.min != null;
-  const hasMax = tag.max != null;
-  // Display range — expand to include actual value if it's out of the expected band
-  let visMin = hasMin ? Math.max(0, tag.min * 0.7) : 0;
-  let visMax = hasMax ? tag.max * 1.25 : (hasMin ? tag.min * 2 : 100);
+  const hasMin = tag.min != null; // alarm low
+  const hasMax = tag.max != null; // alarm high
+  // Instrument range for gauge scale (falls back to alarm-based if not set)
+  const rMin = tag.rangeMin != null ? tag.rangeMin : (hasMin ? Math.max(0, tag.min*0.7) : 0);
+  const rMax = tag.rangeMax != null ? tag.rangeMax : (hasMax ? tag.max*1.25 : (hasMin ? tag.min*2 : 100));
+  let visMin = rMin;
+  let visMax = rMax;
   if(value != null && !isNaN(value)){
-    if(value > visMax) visMax = value * 1.1;      // expand up for high readings
-    if(value < visMin) visMin = Math.max(0, value * 0.9); // expand down for low
+    if(value > visMax) visMax = value * 1.1;
+    if(value < visMin) visMin = Math.max(0, value * 0.9);
   }
   const range = visMax - visMin;
 
@@ -11890,10 +11892,10 @@ function drawSCADAGauge(canvas, tag, value){
     ctx.beginPath(); ctx.arc(cx,cy,6,0,2*Math.PI); ctx.fillStyle="#b0bec5"; ctx.fill();
   }
 
-  // Min/Max labels
+  // Min/Max labels show instrument range
   ctx.font = "700 8px system-ui";
-  if(hasMin){ ctx.fillStyle="#607d8b"; ctx.textAlign="left"; ctx.fillText("MIN:"+tag.min, 2, H-2); }
-  if(hasMax){ ctx.fillStyle="#607d8b"; ctx.textAlign="right"; ctx.fillText("MAX:"+tag.max, W-2, H-2); }
+  ctx.fillStyle="#607d8b"; ctx.textAlign="left"; ctx.fillText(rMin, 2, H-2);
+  ctx.textAlign="right"; ctx.fillText(rMax, W-2, H-2);
 }
 
 
@@ -12347,7 +12349,20 @@ function processImportData(data, statusEl){
   if(_importRows.length){ 
     // Add importedBy field to each row
     _importRows.forEach(r=>r.imported_by=currentUser);
-    sb.from('hourly_entries').upsert(_importRows,{onConflict:'date,hour,operator'}).then(({error})=>{ if(error) showCloudError('Import cloud save partial error: '+error.message); else hideCloudError(); }).catch(e=>showCloudError('Import cloud save failed: '+e.message)); 
+    // Save to Supabase in batches of 100 for reliability on slow networks
+    (async ()=>{
+      const BATCH = 100;
+      let savedOk = true, errMsg = "";
+      for(let b=0; b<_importRows.length; b+=BATCH){
+        const chunk = _importRows.slice(b, b+BATCH);
+        try{
+          const {error} = await sb.from('hourly_entries').upsert(chunk,{onConflict:'date,hour,operator'});
+          if(error){ savedOk=false; errMsg=error.message; }
+        }catch(e){ savedOk=false; errMsg=e.message; }
+      }
+      if(savedOk){ hideCloudError(); toast("✅ All "+_importRows.length+" rows saved to cloud"); }
+      else { showCloudError('Import cloud save partial error: '+errMsg); }
+    })();
   }
   toast(`✅ Imported ${imported} row(s)`+(skipped?`, ${skipped} skipped`:""));
   if(fileInput) fileInput.value="";
@@ -12415,15 +12430,22 @@ function renderAdmin(){
     h.textContent=s.label; wrap.appendChild(h);
     TAGS.filter(t=>t.section===s.id).forEach(t=>{
       if(t.type==="text"||t.type==="select"||t.type==="motor") return; // no ranges for non-numeric
-      const div=document.createElement("div"); div.style.marginBottom="10px"; div.style.padding="8px"; div.style.background="#fafbff"; div.style.borderRadius="8px"; div.style.border="1px solid var(--border)";
-      const alertOn = settings.ranges[t.id].alertEnabled !== false; // default on
-      div.innerHTML=`<div style="font-size:11px;font-weight:700;color:var(--text);margin-bottom:6px">${t.name}</div>
+      const r = settings.ranges[t.id];
+      const div=document.createElement("div"); div.style.marginBottom="12px"; div.style.padding="10px"; div.style.background="#fafbff"; div.style.borderRadius="8px"; div.style.border="1px solid var(--border)";
+      const alertOn = r.alertEnabled !== false;
+      div.innerHTML=`<div style="font-size:11px;font-weight:700;color:var(--text);margin-bottom:8px">${t.name} <span style="color:var(--muted);font-weight:400">(${t.unit||'—'})</span></div>
+        <div style="font-size:9px;font-weight:700;color:var(--blue);margin-bottom:3px">📏 INSTRUMENT RANGE (gauge scale)</div>
+        <div class="row2" style="margin-bottom:8px">
+          <div><label class="lbl">Range Min</label><input type="number" step="0.01" id="rmin_${t.id}" value="${r.rangeMin??r.min??''}" placeholder="e.g. 0"></div>
+          <div><label class="lbl">Range Max</label><input type="number" step="0.01" id="rmax_${t.id}" value="${r.rangeMax??r.max??''}" placeholder="e.g. 100"></div>
+        </div>
+        <div style="font-size:9px;font-weight:700;color:var(--alert);margin-bottom:3px">🚨 ALARM SETPOINTS (trigger alert)</div>
         <div class="row2" style="margin-bottom:6px">
-          <div><label class="lbl">Min</label><input type="number" step="0.01" id="min_${t.id}" value="${settings.ranges[t.id].min??''}" placeholder="none"></div>
-          <div><label class="lbl">Max</label><input type="number" step="0.01" id="max_${t.id}" value="${settings.ranges[t.id].max??''}" placeholder="none"></div>
+          <div><label class="lbl">Alarm Low</label><input type="number" step="0.01" id="amin_${t.id}" value="${r.min??''}" placeholder="none"></div>
+          <div><label class="lbl">Alarm High</label><input type="number" step="0.01" id="amax_${t.id}" value="${r.max??''}" placeholder="e.g. 80"></div>
         </div>
         <label style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted)">
-          <input type="checkbox" id="alert_${t.id}" ${alertOn?'checked':''}> 🔔 Trigger alert when out of range
+          <input type="checkbox" id="alert_${t.id}" ${alertOn?'checked':''}> 🔔 Enable alarm for this tag
         </label>`;
       wrap.appendChild(div);
     });
@@ -12435,18 +12457,28 @@ function renderAdmin(){
 async function saveThresholds(){
   TAGS.forEach(t=>{
     if(t.type==="text"||t.type==="select"||t.type==="motor") return;
-    const minEl=document.getElementById("min_"+t.id), maxEl=document.getElementById("max_"+t.id), alertEl=document.getElementById("alert_"+t.id);
-    if(!minEl) return;
-    const minV=minEl.value, maxV=maxEl.value;
-    settings.ranges[t.id].min = minV===""?null:parseFloat(minV);
-    settings.ranges[t.id].max = maxV===""?null:parseFloat(maxV);
+    const rminEl=document.getElementById("rmin_"+t.id);
+    if(!rminEl) return;
+    const rmin=rminEl.value, rmax=document.getElementById("rmax_"+t.id).value;
+    const amin=document.getElementById("amin_"+t.id).value, amax=document.getElementById("amax_"+t.id).value;
+    const alertEl=document.getElementById("alert_"+t.id);
+    // Range = gauge scale, Alarm = min/max for alerts
+    settings.ranges[t.id].rangeMin = rmin===""?null:parseFloat(rmin);
+    settings.ranges[t.id].rangeMax = rmax===""?null:parseFloat(rmax);
+    settings.ranges[t.id].min = amin===""?null:parseFloat(amin); // alarm low
+    settings.ranges[t.id].max = amax===""?null:parseFloat(amax); // alarm high
     settings.ranges[t.id].alertEnabled = alertEl ? alertEl.checked : true;
-    t.min=settings.ranges[t.id].min; t.max=settings.ranges[t.id].max; t.alertEnabled=settings.ranges[t.id].alertEnabled;
+    // apply to tag object
+    t.rangeMin=settings.ranges[t.id].rangeMin;
+    t.rangeMax=settings.ranges[t.id].rangeMax;
+    t.min=settings.ranges[t.id].min;
+    t.max=settings.ranges[t.id].max;
+    t.alertEnabled=settings.ranges[t.id].alertEnabled;
   });
   await sb.from('settings').upsert({key:'ranges',value:settings.ranges,updated_at:new Date().toISOString()},{onConflict:'key'}).catch(e=>console.error(e));
-  await sb.from('audit_log').insert({actor:currentUser,action:'Updated alert ranges',detail:''}).catch(()=>{});
-  log_audit(currentUser,"Updated alert ranges","");
-  toast("✅ Ranges & alerts saved");
+  await sb.from('audit_log').insert({actor:currentUser,action:'Updated ranges & alarms',detail:''}).catch(()=>{});
+  log_audit(currentUser,"Updated ranges & alarms","");
+  toast("✅ Ranges & alarm setpoints saved");
 }
 async function saveRecipients(){
   settings.recipients.incharge=document.getElementById("rec_incharge").value;
