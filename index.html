@@ -10280,23 +10280,20 @@ canvas.sigpad{width:100%;height:120px;border:1.5px solid var(--border);border-ra
   <div class="login-card">
     <div class="role-tabs">
       <button class="role-tab active" onclick="setLoginRole('operator',this)">👷<br>Operator</button>
-      <button class="role-tab" onclick="setLoginRole('incharge',this)">🧑‍✈️<br>Incharge</button>
+      <button class="role-tab" onclick="setLoginRole('incharge',this)">🧑‍✈️<br>Control Room</button>
       <button class="role-tab" onclick="setLoginRole('hod',this)">👔<br>HoD</button>
       <button class="role-tab" onclick="setLoginRole('admin',this)">👑<br>Admin</button>
     </div>
     <div id="operator_login">
-      <div class="login-title">Shift Operator Login</div>
-      <div class="login-sub">Select your name and enter password</div>
-      <select class="login-inp" id="op_name">
-        <option value="">-- Select Name --</option>
-        <option>Rohit</option>
-      </select>
-      <input class="login-inp" type="password" id="op_pass" placeholder="Enter your password">
+      <div class="login-title">Operator Login</div>
+      <div class="login-sub">Enter password to log hourly readings</div>
+      <input class="login-inp" type="password" id="op_pass" placeholder="Enter operator password">
+      <input type="hidden" id="op_name" value="Operator">
     </div>
     <div id="incharge_login" style="display:none">
-      <div class="login-title">Shift Incharge Login</div>
-      <div class="login-sub">Shared login — enter your name at review time</div>
-      <input class="login-inp" type="password" id="inc_pass" placeholder="Enter incharge password">
+      <div class="login-title">Urea Control Room Login</div>
+      <div class="login-sub">Enter password to review entries</div>
+      <input class="login-inp" type="password" id="inc_pass" placeholder="Enter control room password">
     </div>
     <div id="hod_login" style="display:none">
       <div class="login-title">HoD / Process Incharge</div>
@@ -10402,6 +10399,26 @@ canvas.sigpad{width:100%;height:120px;border:1.5px solid var(--border);border-ra
   </div>
 </div>
 
+<!-- DASHBOARD (HoD/Admin) -->
+<div class="page" id="page_dashboard">
+  <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px">
+    <div style="flex:1;min-width:180px">
+      <div style="font-size:18px;font-weight:800;color:var(--navy)">🏭 Plant Control Dashboard</div>
+      <div class="mini" id="dash_updated">—</div>
+    </div>
+    <div style="display:flex;gap:6px;align-items:center">
+      <input type="date" id="dash_date" onchange="renderDashboard()" style="padding:6px;border:1.5px solid var(--border);border-radius:8px;font-size:12px">
+      <select id="dash_shift" onchange="renderDashboard()" style="padding:6px;border:1.5px solid var(--border);border-radius:8px;font-size:12px">
+        <option value="all">All Shifts</option>
+        <option value="A Shift">A Shift</option>
+        <option value="B Shift">B Shift</option>
+        <option value="C Shift">C Shift</option>
+      </select>
+      <button class="btn btn-outline" onclick="renderDashboard()" style="padding:6px 12px;margin:0">🔄</button>
+    </div>
+  </div>
+  <div id="dash_content"></div>
+</div>
 <!-- RECORDS -->
 <div class="page" id="page_records">
   <div class="card">
@@ -10613,7 +10630,7 @@ canvas.sigpad{width:100%;height:120px;border:1.5px solid var(--border);border-ra
   </div>
   <div class="as">
     <div class="at">📧 Notification Recipients</div>
-    <label class="lbl">Shift Incharge notify email</label>
+    <label class="lbl">Urea Control Room notify email</label>
     <input type="text" id="rec_incharge" value="rohitlokwani@dcmshriram.com">
     <label class="lbl">HoD / Process Incharge email</label>
     <input type="text" id="rec_hod" value="amitkumra@dcmshriram.com">
@@ -10621,8 +10638,14 @@ canvas.sigpad{width:100%;height:120px;border:1.5px solid var(--border);border-ra
   </div>
   <div class="as">
     <div class="at">🔑 Password Reset</div>
-    <select id="reset_person" style="margin-bottom:8px"><option>Rohit</option></select>
-    <input type="text" id="reset_new_pass" placeholder="New password">
+    <label class="lbl">Select login to change password</label>
+    <select id="reset_person" style="margin-bottom:8px">
+      <option value="Operator">Operator</option>
+      <option value="Urea Control Room">Urea Control Room</option>
+      <option value="HoD">HoD</option>
+      <option value="Admin">Admin</option>
+    </select>
+    <input type="text" id="reset_new_pass" placeholder="New password (min 6 chars)">
     <button class="btn btn-blue" onclick="adminResetPass()">🔄 Reset Password</button>
   </div>
   <div class="as" style="border:2px solid var(--alert)">
@@ -10669,7 +10692,7 @@ canvas.sigpad{width:100%;height:120px;border:1.5px solid var(--border);border-ra
 <div id="incident_modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9000;align-items:center;justify-content:center;padding:20px">
   <div style="background:#fff;border-radius:16px;padding:20px;width:100%;max-width:340px">
     <div style="font-size:14px;font-weight:700;color:var(--alert);margin-bottom:12px">🚨 Report Incident</div>
-    <p style="font-size:12px;color:var(--muted);margin-bottom:8px">This will immediately notify Shift Incharge and HoD.</p>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:8px">This will immediately notify Urea Control Room and HoD.</p>
     <input type="text" id="incident_reporter_inp" placeholder="Your name" style="margin-bottom:8px">
     <textarea id="incident_desc_inp" rows="4" placeholder="Describe the incident in detail..." style="width:100%;padding:9px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;margin-bottom:12px"></textarea>
     <div style="display:flex;gap:8px">
@@ -10761,11 +10784,18 @@ const EXPECTED_QR_CODE = "DCM-CCP-UREA-01";
 
 // Passwords stored as SHA-256 hashes only — plaintext never appears in this file.
 // Full server-side authentication (Supabase Auth) is planned for the production build.
-const DEFAULT_PASS_HASHES = {"Rohit":"ecd71870d1963316a97e3ac3408c9835ad8cf0f3c1bc703527c30265534f75ae"};
-let customPasswords = {}; // admin-set overrides for this session (stored hashed)
-const INCHARGE_PASS_HASH = "247f7e418d2357798df0625a520e7adaba5bffc1e83c9c460151cbf41b83c568";
-const HOD_PASS_HASH = "5c8473579466adb756fa9e042efc8d7756217c5f4c950731fcf96bd65ba184e9";
-const ADMIN_PASS_HASH = "240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9";
+const DEFAULT_PASS_HASHES = {"Operator":"7c6e7e36a7752dea4dda536257972a9d44cb116c491248f59ff83a356e2b67cf"};
+let customPasswords = {}; // admin-set overrides (stored hashed, persisted to Supabase)
+// Preload saved passwords at startup so custom passwords work at login
+(async function preloadPasswords(){
+  try{
+    const r = await fetch(SUPABASE_URL+"/rest/v1/settings?key=eq.passwords&select=value", {headers:_sbHeaders()});
+    if(r.ok){ const d = await r.json(); if(d && d[0] && d[0].value) customPasswords = d[0].value; }
+  }catch(e){ /* offline or not set — use defaults */ }
+})();
+const INCHARGE_PASS_HASH = "634f27a047bf79be817258005a7e2bdb1af9bbdc64d26a78e5c9b35fd095b302";
+const HOD_PASS_HASH = "e1784d92caf3ff494c7ff6b5551e9dc922acdef264ddf63da03af4a2c75f9c53";
+const ADMIN_PASS_HASH = "db59aafa44e1b97d02e18831986012ccd5659ca485a9c6b0bb1eef1bc1608140";
 
 async function sha256(text){
   const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
@@ -10794,6 +10824,7 @@ async function loadFromSupabase(){
     if(sData){
       const rec=Object.fromEntries(sData.map(r=>[r.key,r.value]));
       if(rec.recipients) settings.recipients=rec.recipients;
+      if(rec.passwords) customPasswords=rec.passwords;
       if(rec.ranges){ TAGS.forEach(t=>{ if(rec.ranges[t.id]){ t.min=rec.ranges[t.id].min; t.max=rec.ranges[t.id].max; t.rangeMin=rec.ranges[t.id].rangeMin; t.rangeMax=rec.ranges[t.id].rangeMax; t.alertEnabled=rec.ranges[t.id].alertEnabled; settings.ranges[t.id]=rec.ranges[t.id]; } }); }
     }
     supabaseReady=true;
@@ -10836,23 +10867,25 @@ function setLoginRole(role,btn){
 async function doLogin(){
   const err=document.getElementById("login_err"); err.textContent="";
   if(loginRole==="operator"){
-    const name=document.getElementById("op_name").value, pass=document.getElementById("op_pass").value;
-    if(!name){err.textContent="Select your name";return;}
+    const pass=document.getElementById("op_pass").value;
     const enteredHash = await sha256(pass);
-    const correctHash = customPasswords[name]||DEFAULT_PASS_HASHES[name];
+    const correctHash = customPasswords["Operator"]||DEFAULT_PASS_HASHES["Operator"];
     if(enteredHash!==correctHash){err.textContent="❌ Wrong password";return;}
-    currentRole="operator"; currentUser=name;
+    currentRole="operator"; currentUser="Operator";
   } else if(loginRole==="incharge"){
     const enteredHash = await sha256(document.getElementById("inc_pass").value);
-    if(enteredHash!==INCHARGE_PASS_HASH){err.textContent="❌ Wrong password";return;}
-    currentRole="incharge"; currentUser="Shift Incharge (shared login)";
+    const correctHash = customPasswords["Urea Control Room"]||INCHARGE_PASS_HASH;
+    if(enteredHash!==correctHash){err.textContent="❌ Wrong password";return;}
+    currentRole="incharge"; currentUser="Urea Control Room";
   } else if(loginRole==="hod"){
     const enteredHash = await sha256(document.getElementById("hod_pass").value);
-    if(enteredHash!==HOD_PASS_HASH){err.textContent="❌ Wrong password";return;}
+    const correctHash = customPasswords["HoD"]||HOD_PASS_HASH;
+    if(enteredHash!==correctHash){err.textContent="❌ Wrong password";return;}
     currentRole="hod"; currentUser="HoD / Process Incharge";
   } else {
     const enteredHash = await sha256(document.getElementById("adm_pass").value);
-    if(enteredHash!==ADMIN_PASS_HASH){err.textContent="❌ Wrong password";return;}
+    const correctHash = customPasswords["Admin"]||ADMIN_PASS_HASH;
+    if(enteredHash!==correctHash){err.textContent="❌ Wrong password";return;}
     currentRole="admin"; currentUser="Admin";
   }
   log_audit(currentUser,"Login","Role: "+currentRole);
@@ -10867,18 +10900,19 @@ function enterApp(){
   loadFromSupabase();
   document.getElementById("who_line").textContent=currentUser;
   const badge=document.getElementById("role_badge");
-  badge.textContent = currentRole==="operator"?"Operator":currentRole==="incharge"?"Shift Incharge":currentRole==="hod"?"HoD":"Admin";
+  badge.textContent = currentRole==="operator"?"Operator":currentRole==="incharge"?"Urea Control Room":currentRole==="hod"?"HoD":"Admin";
   badge.className="r-badge badge-"+currentRole;
   buildTabs();
   document.getElementById("incident_fab").style.display="block";
   initEntryDefaults();
-  switchTab(currentRole==="operator"?"entry":currentRole==="incharge"?"review":currentRole==="hod"?"records":"admin");
+  switchTab(currentRole==="operator"?"entry":currentRole==="incharge"?"review":currentRole==="hod"?"dashboard":"admin");
 }
 function buildTabs(){
   const all={
     entry:{label:"📋 Entry",roles:["operator"]},
+    dashboard:{label:"📊 Dashboard",roles:["hod","admin"]},
     records:{label:"📁 Records",roles:["operator","incharge","hod","admin"]},
-    analysis:{label:"📊 Analysis",roles:["operator","incharge","hod","admin"]},
+    analysis:{label:"📈 Analysis",roles:["operator","incharge","hod","admin"]},
     download:{label:"⬇️ Download",roles:["operator","incharge","hod","admin"]},
     review:{label:"⏳ Review",roles:["incharge"]},
     incidents:{label:"🚨 Incidents",roles:["incharge","hod","admin"]},
@@ -10908,6 +10942,7 @@ function switchTab(key){
       renderRecords();
     }
   }
+  if(key==="dashboard") renderDashboard();
   if(key==="analysis") renderAnalysis();
   if(key==="download") renderDownloadTags();
   if(key==="review"){ reviewFilter="pending"; document.querySelectorAll("[id^='rv_']").forEach(b=>b.classList.remove("active")); document.getElementById("rv_pending")?.classList.add("active"); renderPendingReviews(); }
@@ -10917,11 +10952,11 @@ function switchTab(key){
 }
 
 function initEntryDefaults(){
-  // Date/hour/shift are now captured from QR scan, not selectable here.
-  // Pre-fill operator name from login
+  // Date/hour/shift are captured from QR scan, not selectable here.
+  // Operator name is the common login
   const nameField = document.getElementById("e_operator_name");
-  if(nameField && currentUser && currentUser!=="Shift Incharge (shared login)" && currentUser!=="Admin"){
-    nameField.value = currentUser;
+  if(nameField){
+    nameField.value = currentUser || "Operator";
   }
 }
 
@@ -11024,7 +11059,7 @@ function manualVerify(){
   const entered = document.getElementById("manual_verify_pass").value.trim();
   if(!entered){ toast("⚠️ Enter the shift verification code"); return; }
   if(entered !== MANUAL_VERIFY_PASS){
-    toast("❌ Wrong verification code — contact your Shift Incharge");
+    toast("❌ Wrong verification code — contact Urea Control Room");
     document.getElementById("manual_verify_pass").value="";
     return;
   }
@@ -11346,7 +11381,7 @@ async function submitHourEntry(){
 
 // ══ INCIDENT ══
 function openIncidentForm(){
-  document.getElementById("incident_reporter_inp").value = currentUser && currentUser!=="Shift Incharge (shared login)"?currentUser:"";
+  document.getElementById("incident_reporter_inp").value = currentUser && currentUser||"";
   document.getElementById("incident_desc_inp").value="";
   showModal("incident_modal");
 }
@@ -11528,6 +11563,7 @@ function renderPendingReviews(){
             <span style="background:#e0f2f1;color:#00695c;font-size:9px;font-weight:700;padding:1px 6px;border-radius:8px">⏰ ${e.shift}</span>
             <span style="background:#f3e5f5;color:#6a1b9a;font-size:9px;font-weight:700;padding:1px 6px;border-radius:8px">👷 ${e.operator}</span>
             ${e.createdAt?`<span style="background:#fff8e1;color:#e65100;font-size:9px;font-weight:700;padding:1px 6px;border-radius:8px">🕐 ${new Date(e.createdAt).toLocaleString('en-IN',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',hour12:true})}</span>`:''}
+            ${e.imported?`<span style="background:#e8eaf6;color:#283593;font-size:9px;font-weight:700;padding:1px 6px;border-radius:8px">📥 Imported by Admin</span>`:''}
           </div>
         </div>
         ${e.alertTags?.length?`<span class="badge b-alert">🚨 ${e.alertTags.length} alerts</span>`:'<span class="badge b-ok">✅ Normal</span>'}
@@ -11720,6 +11756,189 @@ function computeStatValues(){
     });
   }
   return {vals, meta};
+}
+
+// ══ MANAGEMENT DASHBOARD (control-room style) ══
+let dashRefreshTimer = null;
+function renderDashboard(){
+  // default date = latest date with data, or today
+  const dateEl = document.getElementById("dash_date");
+  if(!dateEl.value){
+    const dates = [...new Set(entries.map(e=>e.date))].sort().reverse();
+    dateEl.value = dates[0] || toDateStr(new Date());
+  }
+  const selDate = dateEl.value;
+  const selShift = document.getElementById("dash_shift").value;
+
+  // Filter entries for selected date + shift
+  let dayEntries = entries.filter(e=>e.date===selDate);
+  if(selShift!=="all") dayEntries = dayEntries.filter(e=>e.shift===selShift);
+  // HoD sees only reviewed
+  if(currentRole==="hod") dayEntries = dayEntries.filter(e=>e.status==="Reviewed");
+
+  document.getElementById("dash_updated").textContent =
+    `${selDate} · ${selShift==="all"?"All Shifts":selShift} · ${dayEntries.length} entries · updated ${new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})}`;
+
+  const wrap = document.getElementById("dash_content");
+
+  if(!dayEntries.length){
+    wrap.innerHTML = `<div style="text-align:center;padding:40px;color:var(--muted)">
+      <div style="font-size:40px">📭</div>
+      <div style="font-size:14px;margin-top:8px">No data for ${selDate}${selShift!=="all"?" ("+selShift+")":""}</div>
+      <div class="mini" style="margin-top:4px">Try a different date or shift</div>
+    </div>`;
+    return;
+  }
+
+  // Compute latest value per tag from the day's entries (most recent hour)
+  const sorted = [...dayEntries].sort((a,b)=>(b.date+b.hour).localeCompare(a.date+a.hour));
+  const latest = {};
+  sorted.forEach(e=>{ Object.entries(e.readings||{}).forEach(([k,v])=>{ if(!(k in latest)) latest[k]=v; }); });
+
+  // Health calculation — Parameters Within Limits
+  const numericTags = TAGS.filter(t=>!(t.type==="text"||t.type==="select"||t.type==="motor"));
+  let green=0, amber=0, red=0, nodata=0;
+  const tileData = [];
+  numericTags.forEach(t=>{
+    const v = latest[t.id];
+    if(v==null || isNaN(parseFloat(v))){ nodata++; tileData.push({t, v:null, st:"nodata"}); return; }
+    const val = parseFloat(v);
+    const st = tagStatus(t, val);
+    if(st==="high"||st==="low"){ red++; tileData.push({t, v:val, st:"red"}); }
+    else {
+      // amber if within 6% of a limit
+      let near=false;
+      if(t.max!=null && val >= t.max - Math.abs(t.max)*0.06) near=true;
+      if(t.min!=null && val <= t.min + Math.abs(t.min)*0.06) near=true;
+      if(near){ amber++; tileData.push({t, v:val, st:"amber"}); }
+      else { green++; tileData.push({t, v:val, st:"green"}); }
+    }
+  });
+  const totalMonitored = green+amber+red;
+  const healthPct = totalMonitored>0 ? Math.round((green/totalMonitored)*100) : 0;
+
+  // Count alerts across the day
+  const alertCounts = {};
+  dayEntries.forEach(e=>{ (e.alertTags||[]).forEach(tid=>{ alertCounts[tid]=(alertCounts[tid]||0)+1; }); });
+  const totalAlerts = Object.values(alertCounts).reduce((a,b)=>a+b,0);
+  const rankedAlerts = Object.entries(alertCounts).sort((a,b)=>b[1]-a[1]);
+
+  // Compliance — hours logged out of 24 (or 8 per shift)
+  const expectedHours = selShift==="all" ? 24 : 8;
+  const uniqueHours = new Set(dayEntries.map(e=>e.hour)).size;
+  const compliancePct = Math.round((uniqueHours/expectedHours)*100);
+
+  // Status banner
+  const bannerColor = red>0 ? "#c62828" : amber>0 ? "#f57f17" : "#00695c";
+  const bannerText = red>0 ? `⚠️ ${red} PARAMETER${red>1?'S':''} IN ALARM` : amber>0 ? `⚡ ${amber} APPROACHING LIMIT` : "✅ ALL PARAMETERS NORMAL";
+  const sirenColor = totalAlerts>0 ? "#c62828" : "#00695c";
+  const sirenText = totalAlerts>0 ? `🔔 ${totalAlerts} ALERT${totalAlerts>1?'S':''} TODAY` : "🔕 NO ALERTS";
+
+  // KPI cards — pick 4 key parameters that exist
+  const keyTagIds = ["MP_DISCHARGE","MP_MOTOR","DISCHARGE_PRESS","OIL_IN"];
+  const kpiCards = keyTagIds.map(tid=>{
+    const t = TAGS.find(x=>x.id===tid); if(!t) return "";
+    const v = latest[tid]; if(v==null) return "";
+    const st = tagStatus(t, parseFloat(v));
+    const color = (st==="high"||st==="low") ? "#c62828" : "#0d47a1";
+    // sparkline from day's values
+    const series = [...dayEntries].sort((a,b)=>a.hour.localeCompare(b.hour)).map(e=>e.readings[tid]).filter(x=>x!=null&&!isNaN(parseFloat(x))).map(Number);
+    return `<div style="background:#fff;border:0.5px solid var(--border);border-radius:12px;padding:12px">
+      <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase">${t.name}</div>
+      <div style="font-size:26px;font-weight:800;color:${color};margin:2px 0">${v}<span style="font-size:11px;color:var(--muted);font-weight:600"> ${t.unit}</span></div>
+      <canvas class="dash_spark" data-series="${series.join(',')}" data-color="${color}" width="140" height="30" style="width:100%;height:30px"></canvas>
+      <div class="mini">${rangeText(t)}</div>
+    </div>`;
+  }).filter(x=>x).join("");
+
+  // Traffic-light grid tiles
+  const tiles = tileData.map(({t,v,st})=>{
+    const colors = {green:["#e8f5e9","#00695c","🟢"], amber:["#fff8e1","#f57f17","🟡"], red:["#ffebee","#c62828","🔴"], nodata:["#f5f5f5","#9e9e9e","⚪"]};
+    const [bg,fg,dot] = colors[st];
+    return `<div style="background:${bg};border-radius:8px;padding:8px;border-left:3px solid ${fg}">
+      <div style="font-size:9px;font-weight:700;color:${fg};line-height:1.2;margin-bottom:3px">${dot} ${t.name}</div>
+      <div style="font-size:15px;font-weight:800;color:${fg}">${v!=null?v:"—"}<span style="font-size:9px;font-weight:600"> ${t.unit}</span></div>
+    </div>`;
+  }).join("");
+
+  wrap.innerHTML = `
+    <!-- Status Banners -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+      <div style="background:${bannerColor};color:#fff;border-radius:12px;padding:16px;text-align:center;font-size:16px;font-weight:800">${bannerText}</div>
+      <div style="background:${sirenColor};color:#fff;border-radius:12px;padding:16px;text-align:center;font-size:16px;font-weight:800">${sirenText}</div>
+    </div>
+
+    <!-- KPI strip -->
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:12px">
+      <div style="background:linear-gradient(135deg,#0a1628,#0d47a1);color:#fff;border-radius:12px;padding:14px;text-align:center">
+        <div style="font-size:10px;opacity:.8;text-transform:uppercase;font-weight:700">Parameters Within Limits</div>
+        <div style="font-size:30px;font-weight:800">${green}/${totalMonitored}</div>
+        <div style="font-size:13px;font-weight:700">${healthPct}%</div>
+      </div>
+      <div style="background:#fff;border:0.5px solid var(--border);border-radius:12px;padding:14px;text-align:center">
+        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;font-weight:700">Alerts Today</div>
+        <div style="font-size:30px;font-weight:800;color:${totalAlerts>0?'#c62828':'#00695c'}">${totalAlerts}</div>
+        <div class="mini">${red} in alarm now</div>
+      </div>
+      <div style="background:#fff;border:0.5px solid var(--border);border-radius:12px;padding:14px;text-align:center">
+        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;font-weight:700">Entries Logged</div>
+        <div style="font-size:30px;font-weight:800;color:${compliancePct>=90?'#00695c':compliancePct>=70?'#f57f17':'#c62828'}">${uniqueHours}/${expectedHours}</div>
+        <div class="mini">${compliancePct}% compliance</div>
+      </div>
+      <div style="background:#fff;border:0.5px solid var(--border);border-radius:12px;padding:14px;text-align:center">
+        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;font-weight:700">Status Breakdown</div>
+        <div style="font-size:16px;font-weight:800;margin-top:4px">🟢${green} 🟡${amber} 🔴${red} ⚪${nodata}</div>
+        <div class="mini">of ${numericTags.length} parameters</div>
+      </div>
+    </div>
+
+    ${kpiCards ? `<div style="font-size:12px;font-weight:800;color:var(--navy);margin-bottom:6px">📈 KEY PARAMETERS</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:14px">${kpiCards}</div>` : ""}
+
+    ${rankedAlerts.length ? `<div style="font-size:12px;font-weight:800;color:var(--alert);margin-bottom:6px">🚨 ALERT SUMMARY (ranked)</div>
+    <div style="background:#fff;border:0.5px solid var(--border);border-radius:12px;padding:10px;margin-bottom:14px">
+      ${rankedAlerts.map(([tid,cnt])=>{ const t=TAGS.find(x=>x.id===tid); return `<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #f0f0f0;font-size:12px"><span>🔴 ${t?t.name:tid}</span><span style="font-weight:800;color:var(--alert)">${cnt}×</span></div>`; }).join('')}
+    </div>` : ""}
+
+    <div style="font-size:12px;font-weight:800;color:var(--navy);margin-bottom:6px">🎛️ ALL PARAMETERS (traffic light)</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px">${tiles}</div>
+
+    <div style="margin-top:14px;padding:10px;background:#f8f9ff;border-radius:8px;font-size:10px;color:var(--muted);line-height:1.4">
+      ℹ️ <strong>Parameters Within Limits</strong> reflects logged readings vs alarm setpoints only. 🟢 within limits · 🟡 within 6% of a limit · 🔴 alarm breached · ⚪ no data. This is a logbook health indicator, not a mechanical/predictive health system.
+    </div>
+  `;
+
+  // Draw sparklines
+  wrap.querySelectorAll(".dash_spark").forEach(canvas=>{
+    const series = canvas.dataset.series.split(",").map(Number).filter(x=>!isNaN(x));
+    const color = canvas.dataset.color;
+    drawSparkline(canvas, series, color);
+  });
+
+  // Auto-refresh every 60s
+  if(dashRefreshTimer) clearTimeout(dashRefreshTimer);
+  dashRefreshTimer = setTimeout(()=>{ if(document.getElementById("page_dashboard").classList.contains("active")) renderDashboard(); }, 60000);
+}
+
+function drawSparkline(canvas, series, color){
+  const dpr = window.devicePixelRatio||2;
+  const w = canvas.clientWidth||140, h = 30;
+  canvas.width = w*dpr; canvas.height = h*dpr;
+  const ctx = canvas.getContext("2d"); ctx.scale(dpr,dpr);
+  ctx.clearRect(0,0,w,h);
+  if(series.length<2) return;
+  const min = Math.min(...series), max = Math.max(...series);
+  const range = max-min || 1;
+  const step = w/(series.length-1);
+  // area fill
+  ctx.beginPath();
+  series.forEach((v,i)=>{ const x=i*step, y=h-4-((v-min)/range)*(h-8); i?ctx.lineTo(x,y):ctx.moveTo(x,y); });
+  ctx.lineTo(w,h); ctx.lineTo(0,h); ctx.closePath();
+  ctx.fillStyle = color+"18"; ctx.fill();
+  // line
+  ctx.beginPath();
+  series.forEach((v,i)=>{ const x=i*step, y=h-4-((v-min)/range)*(h-8); i?ctx.lineTo(x,y):ctx.moveTo(x,y); });
+  ctx.strokeStyle = color; ctx.lineWidth=1.5; ctx.stroke();
 }
 
 function renderStatCards(){
@@ -12256,7 +12475,7 @@ function csvHeaders(){
 }
 function downloadCsvTemplate(){
   const hdrs = csvHeaders();
-  const exampleRow = ["2026-07-01","0700","A Shift","Rohit",...TAGS.map(t=>"")];
+  const exampleRow = ["2026-07-01","0700","A Shift","Operator",...TAGS.map(t=>"")];
   const csv = [hdrs.join(","), exampleRow.map(v=>`"${v}"`).join(",")].join("\n");
   triggerDownload(csv,"CCP_Import_Template.csv");
 }
@@ -12275,20 +12494,26 @@ function importFile(){
     const reader = new FileReader();
     reader.onload = function(e){
       try{
-        const wb = XLSX.read(e.target.result, {type:"array"});
+        const wb = XLSX.read(e.target.result, {type:"array", cellDates:false});
         // Read ALL tabs/sheets in the workbook, not just the first
         let allData = [];
         let tabsRead = 0;
         wb.SheetNames.forEach(sheetName=>{
           const ws = wb.Sheets[sheetName];
-          const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:""});
+          const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:"", raw:false});
           if(!rows.length) return;
           const headers = rows[0].map(h=>String(h).trim());
           // Only process tabs that have a "Date" column (skip empty/non-data tabs)
           if(!headers.includes("Date")) return;
+          // If the tab NAME looks like a date, use it as the authoritative date
+          // (handles cases where the Date column was mis-typed or Excel-converted)
+          const tabDateMatch = sheetName.trim().match(/^(\d{1,2})[.\-\/](\d{1,2})[.\-\/](\d{4})$/);
+          const tabDate = tabDateMatch ? tabDateMatch[1].padStart(2,"0")+"-"+tabDateMatch[2].padStart(2,"0")+"-"+tabDateMatch[3] : null;
           const tabData = rows.slice(1).map(row=>{
             const obj={};
             headers.forEach((h,i)=>{ obj[h]=String(row[i]||"").trim(); });
+            // Override date with tab name if available (more reliable)
+            if(tabDate) obj["Date"] = tabDate;
             return obj;
           }).filter(row=>Object.values(row).some(v=>v!==""));
           if(tabData.length){ allData = allData.concat(tabData); tabsRead++; }
@@ -12500,10 +12725,15 @@ async function saveRecipients(){
 async function adminResetPass(){
   const person=document.getElementById("reset_person").value;
   const newPass=document.getElementById("reset_new_pass").value.trim();
-  if(!newPass||newPass.length<4){ toast("⚠️ Password too short"); return; }
-  customPasswords[person]=await sha256(newPass);
+  if(!newPass||newPass.length<6){ toast("⚠️ Password must be at least 6 characters"); return; }
+  const hash = await sha256(newPass);
+  customPasswords[person]=hash;
+  // Persist to Supabase settings so it survives reload
+  try{
+    await sb.from('settings').upsert({key:'passwords',value:customPasswords,updated_at:new Date().toISOString()},{onConflict:'key'});
+  }catch(e){ console.error("password save error", e); }
   log_audit(currentUser,"Password reset","For "+person);
-  toast("✅ Password reset for "+person);
+  toast("✅ Password changed for "+person+" (saved)");
   document.getElementById("reset_new_pass").value="";
 }
 </script>
