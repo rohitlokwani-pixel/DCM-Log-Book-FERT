@@ -10406,8 +10406,11 @@ canvas.sigpad{width:100%;height:120px;border:1.5px solid var(--border);border-ra
       <div style="font-size:18px;font-weight:800;color:var(--navy)">🏭 Plant Control Dashboard</div>
       <div class="mini" id="dash_updated">—</div>
     </div>
-    <div style="display:flex;gap:6px;align-items:center">
-      <input type="date" id="dash_date" onchange="renderDashboard()" style="padding:6px;border:1.5px solid var(--border);border-radius:8px;font-size:12px">
+    <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+      <label class="lbl" style="margin:0">From</label>
+      <input type="date" id="dash_from" onchange="renderDashboard()" style="padding:6px;border:1.5px solid var(--border);border-radius:8px;font-size:12px">
+      <label class="lbl" style="margin:0">To</label>
+      <input type="date" id="dash_to" onchange="renderDashboard()" style="padding:6px;border:1.5px solid var(--border);border-radius:8px;font-size:12px">
       <select id="dash_shift" onchange="renderDashboard()" style="padding:6px;border:1.5px solid var(--border);border-radius:8px;font-size:12px">
         <option value="all">All Shifts</option>
         <option value="A Shift">A Shift</option>
@@ -10910,7 +10913,7 @@ function enterApp(){
 function buildTabs(){
   const all={
     entry:{label:"📋 Entry",roles:["operator"]},
-    dashboard:{label:"📊 Dashboard",roles:["hod","admin"]},
+    dashboard:{label:"📊 Dashboard",roles:["incharge","hod","admin"]},
     records:{label:"📁 Records",roles:["operator","incharge","hod","admin"]},
     analysis:{label:"📈 Analysis",roles:["operator","incharge","hod","admin"]},
     download:{label:"⬇️ Download",roles:["operator","incharge","hod","admin"]},
@@ -11761,41 +11764,50 @@ function computeStatValues(){
 // ══ MANAGEMENT DASHBOARD (control-room style) ══
 let dashRefreshTimer = null;
 function renderDashboard(){
-  // default date = latest date with data, or today
-  const dateEl = document.getElementById("dash_date");
-  if(!dateEl.value){
-    const dates = [...new Set(entries.map(e=>e.date))].sort().reverse();
-    dateEl.value = dates[0] || toDateStr(new Date());
+  // Default date range = last 7 days ending at latest data date (or today)
+  const fromEl = document.getElementById("dash_from");
+  const toEl = document.getElementById("dash_to");
+  const allDates = [...new Set(entries.map(e=>e.date))].sort();
+  if(!toEl.value){
+    toEl.value = allDates.length ? allDates[allDates.length-1] : toDateStr(new Date());
   }
-  const selDate = dateEl.value;
+  if(!fromEl.value){
+    // default From = 7 days before To, or earliest data
+    const toD = new Date(toEl.value);
+    toD.setDate(toD.getDate()-6);
+    const wk = toDateStr(toD);
+    fromEl.value = (allDates.length && allDates[0] > wk) ? allDates[0] : wk;
+  }
+  const fromDate = fromEl.value, toDate = toEl.value;
   const selShift = document.getElementById("dash_shift").value;
 
-  // Filter entries for selected date + shift
-  let dayEntries = entries.filter(e=>e.date===selDate);
-  if(selShift!=="all") dayEntries = dayEntries.filter(e=>e.shift===selShift);
-  // HoD sees only reviewed
-  if(currentRole==="hod") dayEntries = dayEntries.filter(e=>e.status==="Reviewed");
+  // Filter entries in range + shift
+  let rangeEntries = entries.filter(e=>e.date>=fromDate && e.date<=toDate);
+  if(selShift!=="all") rangeEntries = rangeEntries.filter(e=>e.shift===selShift);
+  // Control Room + HoD: show reviewed + pending (so imported/pending data is visible);
+  // only exclude rejected
+  rangeEntries = rangeEntries.filter(e=>e.status!=="Rejected");
 
   document.getElementById("dash_updated").textContent =
-    `${selDate} · ${selShift==="all"?"All Shifts":selShift} · ${dayEntries.length} entries · updated ${new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})}`;
+    `${fromDate} → ${toDate} · ${selShift==="all"?"All Shifts":selShift} · ${rangeEntries.length} entries · updated ${new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})}`;
 
   const wrap = document.getElementById("dash_content");
 
-  if(!dayEntries.length){
+  if(!rangeEntries.length){
     wrap.innerHTML = `<div style="text-align:center;padding:40px;color:var(--muted)">
       <div style="font-size:40px">📭</div>
-      <div style="font-size:14px;margin-top:8px">No data for ${selDate}${selShift!=="all"?" ("+selShift+")":""}</div>
-      <div class="mini" style="margin-top:4px">Try a different date or shift</div>
+      <div style="font-size:14px;margin-top:8px">No data between ${fromDate} and ${toDate}${selShift!=="all"?" ("+selShift+")":""}</div>
+      <div class="mini" style="margin-top:4px">Try a wider date range or different shift. ${allDates.length?"Data exists for: "+allDates[0]+" to "+allDates[allDates.length-1]:"No entries in system yet."}</div>
     </div>`;
     return;
   }
 
-  // Compute latest value per tag from the day's entries (most recent hour)
-  const sorted = [...dayEntries].sort((a,b)=>(b.date+b.hour).localeCompare(a.date+a.hour));
+  // Latest value per tag (most recent entry in range)
+  const sorted = [...rangeEntries].sort((a,b)=>(b.date+b.hour).localeCompare(a.date+a.hour));
   const latest = {};
   sorted.forEach(e=>{ Object.entries(e.readings||{}).forEach(([k,v])=>{ if(!(k in latest)) latest[k]=v; }); });
 
-  // Health calculation — Parameters Within Limits
+  // Health — Parameters Within Limits
   const numericTags = TAGS.filter(t=>!(t.type==="text"||t.type==="select"||t.type==="motor"));
   let green=0, amber=0, red=0, nodata=0;
   const tileData = [];
@@ -11806,7 +11818,6 @@ function renderDashboard(){
     const st = tagStatus(t, val);
     if(st==="high"||st==="low"){ red++; tileData.push({t, v:val, st:"red"}); }
     else {
-      // amber if within 6% of a limit
       let near=false;
       if(t.max!=null && val >= t.max - Math.abs(t.max)*0.06) near=true;
       if(t.min!=null && val <= t.min + Math.abs(t.min)*0.06) near=true;
@@ -11817,32 +11828,31 @@ function renderDashboard(){
   const totalMonitored = green+amber+red;
   const healthPct = totalMonitored>0 ? Math.round((green/totalMonitored)*100) : 0;
 
-  // Count alerts across the day
+  // Alerts across range
   const alertCounts = {};
-  dayEntries.forEach(e=>{ (e.alertTags||[]).forEach(tid=>{ alertCounts[tid]=(alertCounts[tid]||0)+1; }); });
+  rangeEntries.forEach(e=>{ (e.alertTags||[]).forEach(tid=>{ alertCounts[tid]=(alertCounts[tid]||0)+1; }); });
   const totalAlerts = Object.values(alertCounts).reduce((a,b)=>a+b,0);
   const rankedAlerts = Object.entries(alertCounts).sort((a,b)=>b[1]-a[1]);
 
-  // Compliance — hours logged out of 24 (or 8 per shift)
-  const expectedHours = selShift==="all" ? 24 : 8;
-  const uniqueHours = new Set(dayEntries.map(e=>e.hour)).size;
-  const compliancePct = Math.round((uniqueHours/expectedHours)*100);
+  // Compliance — count days and expected hours
+  const daysInRange = new Set(rangeEntries.map(e=>e.date)).size;
+  const perDay = selShift==="all" ? 24 : 8;
+  const expectedTotal = daysInRange * perDay;
+  const loggedTotal = rangeEntries.length;
+  const compliancePct = expectedTotal>0 ? Math.min(100, Math.round((loggedTotal/expectedTotal)*100)) : 0;
 
-  // Status banner
   const bannerColor = red>0 ? "#c62828" : amber>0 ? "#f57f17" : "#00695c";
   const bannerText = red>0 ? `⚠️ ${red} PARAMETER${red>1?'S':''} IN ALARM` : amber>0 ? `⚡ ${amber} APPROACHING LIMIT` : "✅ ALL PARAMETERS NORMAL";
   const sirenColor = totalAlerts>0 ? "#c62828" : "#00695c";
-  const sirenText = totalAlerts>0 ? `🔔 ${totalAlerts} ALERT${totalAlerts>1?'S':''} TODAY` : "🔕 NO ALERTS";
+  const sirenText = totalAlerts>0 ? `🔔 ${totalAlerts} ALERT${totalAlerts>1?'S':''} IN PERIOD` : "🔕 NO ALERTS";
 
-  // KPI cards — pick 4 key parameters that exist
   const keyTagIds = ["MP_DISCHARGE","MP_MOTOR","DISCHARGE_PRESS","OIL_IN"];
   const kpiCards = keyTagIds.map(tid=>{
     const t = TAGS.find(x=>x.id===tid); if(!t) return "";
     const v = latest[tid]; if(v==null) return "";
     const st = tagStatus(t, parseFloat(v));
     const color = (st==="high"||st==="low") ? "#c62828" : "#0d47a1";
-    // sparkline from day's values
-    const series = [...dayEntries].sort((a,b)=>a.hour.localeCompare(b.hour)).map(e=>e.readings[tid]).filter(x=>x!=null&&!isNaN(parseFloat(x))).map(Number);
+    const series = [...rangeEntries].sort((a,b)=>(a.date+a.hour).localeCompare(b.date+b.hour)).map(e=>e.readings[tid]).filter(x=>x!=null&&!isNaN(parseFloat(x))).map(Number);
     return `<div style="background:#fff;border:0.5px solid var(--border);border-radius:12px;padding:12px">
       <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase">${t.name}</div>
       <div style="font-size:26px;font-weight:800;color:${color};margin:2px 0">${v}<span style="font-size:11px;color:var(--muted);font-weight:600"> ${t.unit}</span></div>
@@ -11851,7 +11861,6 @@ function renderDashboard(){
     </div>`;
   }).filter(x=>x).join("");
 
-  // Traffic-light grid tiles
   const tiles = tileData.map(({t,v,st})=>{
     const colors = {green:["#e8f5e9","#00695c","🟢"], amber:["#fff8e1","#f57f17","🟡"], red:["#ffebee","#c62828","🔴"], nodata:["#f5f5f5","#9e9e9e","⚪"]};
     const [bg,fg,dot] = colors[st];
@@ -11862,13 +11871,10 @@ function renderDashboard(){
   }).join("");
 
   wrap.innerHTML = `
-    <!-- Status Banners -->
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
       <div style="background:${bannerColor};color:#fff;border-radius:12px;padding:16px;text-align:center;font-size:16px;font-weight:800">${bannerText}</div>
       <div style="background:${sirenColor};color:#fff;border-radius:12px;padding:16px;text-align:center;font-size:16px;font-weight:800">${sirenText}</div>
     </div>
-
-    <!-- KPI strip -->
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:12px">
       <div style="background:linear-gradient(135deg,#0a1628,#0d47a1);color:#fff;border-radius:12px;padding:14px;text-align:center">
         <div style="font-size:10px;opacity:.8;text-transform:uppercase;font-weight:700">Parameters Within Limits</div>
@@ -11876,14 +11882,14 @@ function renderDashboard(){
         <div style="font-size:13px;font-weight:700">${healthPct}%</div>
       </div>
       <div style="background:#fff;border:0.5px solid var(--border);border-radius:12px;padding:14px;text-align:center">
-        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;font-weight:700">Alerts Today</div>
+        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;font-weight:700">Alerts in Period</div>
         <div style="font-size:30px;font-weight:800;color:${totalAlerts>0?'#c62828':'#00695c'}">${totalAlerts}</div>
-        <div class="mini">${red} in alarm now</div>
+        <div class="mini">${red} in alarm (latest)</div>
       </div>
       <div style="background:#fff;border:0.5px solid var(--border);border-radius:12px;padding:14px;text-align:center">
         <div style="font-size:10px;color:var(--muted);text-transform:uppercase;font-weight:700">Entries Logged</div>
-        <div style="font-size:30px;font-weight:800;color:${compliancePct>=90?'#00695c':compliancePct>=70?'#f57f17':'#c62828'}">${uniqueHours}/${expectedHours}</div>
-        <div class="mini">${compliancePct}% compliance</div>
+        <div style="font-size:30px;font-weight:800;color:${compliancePct>=90?'#00695c':compliancePct>=70?'#f57f17':'#c62828'}">${loggedTotal}</div>
+        <div class="mini">${compliancePct}% of ${expectedTotal} (${daysInRange}d)</div>
       </div>
       <div style="background:#fff;border:0.5px solid var(--border);border-radius:12px;padding:14px;text-align:center">
         <div style="font-size:10px;color:var(--muted);text-transform:uppercase;font-weight:700">Status Breakdown</div>
@@ -11891,31 +11897,24 @@ function renderDashboard(){
         <div class="mini">of ${numericTags.length} parameters</div>
       </div>
     </div>
-
-    ${kpiCards ? `<div style="font-size:12px;font-weight:800;color:var(--navy);margin-bottom:6px">📈 KEY PARAMETERS</div>
+    ${kpiCards ? `<div style="font-size:12px;font-weight:800;color:var(--navy);margin-bottom:6px">📈 KEY PARAMETERS (latest in period)</div>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:14px">${kpiCards}</div>` : ""}
-
     ${rankedAlerts.length ? `<div style="font-size:12px;font-weight:800;color:var(--alert);margin-bottom:6px">🚨 ALERT SUMMARY (ranked)</div>
     <div style="background:#fff;border:0.5px solid var(--border);border-radius:12px;padding:10px;margin-bottom:14px">
       ${rankedAlerts.map(([tid,cnt])=>{ const t=TAGS.find(x=>x.id===tid); return `<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #f0f0f0;font-size:12px"><span>🔴 ${t?t.name:tid}</span><span style="font-weight:800;color:var(--alert)">${cnt}×</span></div>`; }).join('')}
     </div>` : ""}
-
-    <div style="font-size:12px;font-weight:800;color:var(--navy);margin-bottom:6px">🎛️ ALL PARAMETERS (traffic light)</div>
+    <div style="font-size:12px;font-weight:800;color:var(--navy);margin-bottom:6px">🎛️ ALL PARAMETERS (latest values, traffic light)</div>
     <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px">${tiles}</div>
-
     <div style="margin-top:14px;padding:10px;background:#f8f9ff;border-radius:8px;font-size:10px;color:var(--muted);line-height:1.4">
-      ℹ️ <strong>Parameters Within Limits</strong> reflects logged readings vs alarm setpoints only. 🟢 within limits · 🟡 within 6% of a limit · 🔴 alarm breached · ⚪ no data. This is a logbook health indicator, not a mechanical/predictive health system.
+      ℹ️ <strong>Parameters Within Limits</strong> reflects the latest logged readings vs alarm setpoints in the selected period. 🟢 within limits · 🟡 within 6% of a limit · 🔴 alarm breached · ⚪ no data. This is a logbook health indicator, not a mechanical/predictive health system.
     </div>
   `;
 
-  // Draw sparklines
   wrap.querySelectorAll(".dash_spark").forEach(canvas=>{
     const series = canvas.dataset.series.split(",").map(Number).filter(x=>!isNaN(x));
-    const color = canvas.dataset.color;
-    drawSparkline(canvas, series, color);
+    drawSparkline(canvas, series, canvas.dataset.color);
   });
 
-  // Auto-refresh every 60s
   if(dashRefreshTimer) clearTimeout(dashRefreshTimer);
   dashRefreshTimer = setTimeout(()=>{ if(document.getElementById("page_dashboard").classList.contains("active")) renderDashboard(); }, 60000);
 }
