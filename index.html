@@ -10401,26 +10401,28 @@ canvas.sigpad{width:100%;height:120px;border:1.5px solid var(--border);border-ra
 
 <!-- DASHBOARD (HoD/Admin) -->
 <div class="page" id="page_dashboard">
-  <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px">
+  <div style="background:#0a1420;margin:-16px -16px 0;padding:16px;min-height:100vh">
+  <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:14px">
     <div style="flex:1;min-width:180px">
-      <div style="font-size:18px;font-weight:800;color:var(--navy)">🏭 Plant Control Dashboard</div>
-      <div class="mini" id="dash_updated">—</div>
+      <div style="font-size:18px;font-weight:700;color:#e8eef5">🏭 CCP Urea Plant · Control Room</div>
+      <div style="font-size:11px;color:#5a7391" id="dash_updated">—</div>
     </div>
     <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
-      <label class="lbl" style="margin:0">From</label>
-      <input type="date" id="dash_from" onchange="renderDashboard()" style="padding:6px;border:1.5px solid var(--border);border-radius:8px;font-size:12px">
-      <label class="lbl" style="margin:0">To</label>
-      <input type="date" id="dash_to" onchange="renderDashboard()" style="padding:6px;border:1.5px solid var(--border);border-radius:8px;font-size:12px">
-      <select id="dash_shift" onchange="renderDashboard()" style="padding:6px;border:1.5px solid var(--border);border-radius:8px;font-size:12px">
+      <label style="margin:0;font-size:11px;color:#8fa8c4">From</label>
+      <input type="date" id="dash_from" onchange="renderDashboard()" style="padding:6px;border:1px solid #1e3550;background:#132437;color:#e8eef5;border-radius:8px;font-size:12px">
+      <label style="margin:0;font-size:11px;color:#8fa8c4">To</label>
+      <input type="date" id="dash_to" onchange="renderDashboard()" style="padding:6px;border:1px solid #1e3550;background:#132437;color:#e8eef5;border-radius:8px;font-size:12px">
+      <select id="dash_shift" onchange="renderDashboard()" style="padding:6px;border:1px solid #1e3550;background:#132437;color:#e8eef5;border-radius:8px;font-size:12px">
         <option value="all">All Shifts</option>
         <option value="A Shift">A Shift</option>
         <option value="B Shift">B Shift</option>
         <option value="C Shift">C Shift</option>
       </select>
-      <button class="btn btn-outline" onclick="renderDashboard()" style="padding:6px 12px;margin:0">🔄</button>
+      <button onclick="renderDashboard()" style="padding:6px 12px;margin:0;background:#132437;border:1px solid #1e3550;color:#8fa8c4;border-radius:8px;cursor:pointer">🔄</button>
     </div>
   </div>
   <div id="dash_content"></div>
+  </div>
 </div>
 <!-- RECORDS -->
 <div class="page" id="page_records">
@@ -11794,10 +11796,10 @@ function renderDashboard(){
   const wrap = document.getElementById("dash_content");
 
   if(!rangeEntries.length){
-    wrap.innerHTML = `<div style="text-align:center;padding:40px;color:var(--muted)">
+    wrap.innerHTML = `<div style="text-align:center;padding:40px;color:#5a7391">
       <div style="font-size:40px">📭</div>
-      <div style="font-size:14px;margin-top:8px">No data between ${fromDate} and ${toDate}${selShift!=="all"?" ("+selShift+")":""}</div>
-      <div class="mini" style="margin-top:4px">Try a wider date range or different shift. ${allDates.length?"Data exists for: "+allDates[0]+" to "+allDates[allDates.length-1]:"No entries in system yet."}</div>
+      <div style="font-size:14px;margin-top:8px;color:#8fa8c4">No data between ${fromDate} and ${toDate}${selShift!=="all"?" ("+selShift+")":""}</div>
+      <div style="font-size:11px;margin-top:4px;color:#5a7391">Try a wider date range or different shift. ${allDates.length?"Data exists for: "+allDates[0]+" to "+allDates[allDates.length-1]:"No entries in system yet."}</div>
     </div>`;
     return;
   }
@@ -11841,75 +11843,85 @@ function renderDashboard(){
   const loggedTotal = rangeEntries.length;
   const compliancePct = expectedTotal>0 ? Math.min(100, Math.round((loggedTotal/expectedTotal)*100)) : 0;
 
-  const bannerColor = red>0 ? "#c62828" : amber>0 ? "#f57f17" : "#00695c";
-  const bannerText = red>0 ? `⚠️ ${red} PARAMETER${red>1?'S':''} IN ALARM` : amber>0 ? `⚡ ${amber} APPROACHING LIMIT` : "✅ ALL PARAMETERS NORMAL";
-  const sirenColor = totalAlerts>0 ? "#c62828" : "#00695c";
+  const bannerText = red>0 ? `⚠ ${red} PARAMETER${red>1?'S':''} IN ALARM` : amber>0 ? `⚡ ${amber} APPROACHING LIMIT` : "✓ ALL PARAMETERS NORMAL";
+  const bannerBg = red>0 ? "#3a1518" : amber>0 ? "#2b2416" : "#0d3320";
+  const bannerBorder = red>0 ? "#7a2a2f" : amber>0 ? "#6b5518" : "#1a5c37";
+  const bannerFg = red>0 ? "#f87171" : amber>0 ? "#fbbf24" : "#4ade80";
   const sirenText = totalAlerts>0 ? `🔔 ${totalAlerts} ALERT${totalAlerts>1?'S':''} IN PERIOD` : "🔕 NO ALERTS";
+  const sirenBg = totalAlerts>0 ? "#3a1518" : "#0d3320";
+  const sirenBorder = totalAlerts>0 ? "#7a2a2f" : "#1a5c37";
+  const sirenFg = totalAlerts>0 ? "#f87171" : "#4ade80";
 
+  // Gauge cards — key numeric params with min/max
+  const gaugeTagIds = ["MP_DISCHARGE","DISCHARGE_TEMP","BP_MOTOR","MP_PI8","MP_MOTOR","MP_PI7A"];
+  const gaugeTags = gaugeTagIds.map(id=>TAGS.find(t=>t.id===id)).filter(t=>t && latest[t.id]!=null && (t.min!=null||t.max!=null)).slice(0,4);
+  const gaugeCards = gaugeTags.map((t,i)=>`<div style="background:#132437;border:1px solid #1e3550;border-radius:12px;padding:8px;text-align:center">
+      <div style="font-size:9px;color:#5a7391;text-transform:uppercase;margin-bottom:2px">${t.name}</div>
+      <canvas class="dash_gauge" data-tag="${t.id}" data-val="${latest[t.id]}"></canvas>
+    </div>`).join("");
+
+  // KPI trend cards (dark)
   const keyTagIds = ["MP_DISCHARGE","MP_MOTOR","DISCHARGE_PRESS","OIL_IN"];
   const kpiCards = keyTagIds.map(tid=>{
     const t = TAGS.find(x=>x.id===tid); if(!t) return "";
     const v = latest[tid]; if(v==null) return "";
     const st = tagStatus(t, parseFloat(v));
-    const color = (st==="high"||st==="low") ? "#c62828" : "#0d47a1";
+    const color = (st==="high"||st==="low") ? "#f87171" : "#60a5fa";
     const series = [...rangeEntries].sort((a,b)=>(a.date+a.hour).localeCompare(b.date+b.hour)).map(e=>e.readings[tid]).filter(x=>x!=null&&!isNaN(parseFloat(x))).map(Number);
-    return `<div style="background:#fff;border:0.5px solid var(--border);border-radius:12px;padding:12px">
-      <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase">${t.name}</div>
-      <div style="font-size:26px;font-weight:800;color:${color};margin:2px 0">${v}<span style="font-size:11px;color:var(--muted);font-weight:600"> ${t.unit}</span></div>
-      <canvas class="dash_spark" data-series="${series.join(',')}" data-color="${color}" width="140" height="30" style="width:100%;height:30px"></canvas>
-      <div class="mini">${rangeText(t)}</div>
+    return `<div style="background:#132437;border:1px solid #1e3550;border-radius:12px;padding:10px">
+      <div style="font-size:9px;color:#5a7391;text-transform:uppercase">${t.name}</div>
+      <div style="font-size:22px;font-weight:600;color:${color};margin:2px 0">${v}<span style="font-size:10px;color:#5a7391;font-weight:400"> ${t.unit}</span></div>
+      <canvas class="dash_spark" data-series="${series.join(',')}" data-color="${color}" width="140" height="28" style="width:100%;height:28px"></canvas>
+      <div style="font-size:9px;color:#5a7391;margin-top:2px">${rangeText(t)}</div>
     </div>`;
   }).filter(x=>x).join("");
 
-  const tiles = tileData.map(({t,v,st})=>{
-    const colors = {green:["#e8f5e9","#00695c","🟢"], amber:["#fff8e1","#f57f17","🟡"], red:["#ffebee","#c62828","🔴"], nodata:["#f5f5f5","#9e9e9e","⚪"]};
-    const [bg,fg,dot] = colors[st];
-    return `<div style="background:${bg};border-radius:8px;padding:8px;border-left:3px solid ${fg}">
-      <div style="font-size:9px;font-weight:700;color:${fg};line-height:1.2;margin-bottom:3px">${dot} ${t.name}</div>
-      <div style="font-size:15px;font-weight:800;color:${fg}">${v!=null?v:"—"}<span style="font-size:9px;font-weight:600"> ${t.unit}</span></div>
-    </div>`;
-  }).join("");
-
   wrap.innerHTML = `
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
-      <div style="background:${bannerColor};color:#fff;border-radius:12px;padding:16px;text-align:center;font-size:16px;font-weight:800">${bannerText}</div>
-      <div style="background:${sirenColor};color:#fff;border-radius:12px;padding:16px;text-align:center;font-size:16px;font-weight:800">${sirenText}</div>
+      <div style="background:${bannerBg};border:1px solid ${bannerBorder};border-radius:12px;padding:15px;text-align:center;font-size:15px;font-weight:600;color:${bannerFg}">${bannerText}</div>
+      <div style="background:${sirenBg};border:1px solid ${sirenBorder};border-radius:12px;padding:15px;text-align:center;font-size:15px;font-weight:600;color:${sirenFg}">${sirenText}</div>
     </div>
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:12px">
-      <div style="background:linear-gradient(135deg,#0a1628,#0d47a1);color:#fff;border-radius:12px;padding:14px;text-align:center">
-        <div style="font-size:10px;opacity:.8;text-transform:uppercase;font-weight:700">Parameters Within Limits</div>
-        <div style="font-size:30px;font-weight:800">${green}/${totalMonitored}</div>
-        <div style="font-size:13px;font-weight:700">${healthPct}%</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:14px">
+      <div style="background:#132437;border:1px solid #1e3550;border-radius:12px;padding:13px;text-align:center">
+        <div style="font-size:9px;color:#5a7391;text-transform:uppercase;letter-spacing:.5px">Within Limits</div>
+        <div style="font-size:28px;font-weight:600;color:#4ade80">${green}<span style="font-size:13px;color:#5a7391">/${totalMonitored}</span></div>
+        <div style="font-size:12px;color:#8fa8c4">${healthPct}%</div>
       </div>
-      <div style="background:#fff;border:0.5px solid var(--border);border-radius:12px;padding:14px;text-align:center">
-        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;font-weight:700">Alerts in Period</div>
-        <div style="font-size:30px;font-weight:800;color:${totalAlerts>0?'#c62828':'#00695c'}">${totalAlerts}</div>
-        <div class="mini">${red} in alarm (latest)</div>
+      <div style="background:#132437;border:1px solid #1e3550;border-radius:12px;padding:13px;text-align:center">
+        <div style="font-size:9px;color:#5a7391;text-transform:uppercase;letter-spacing:.5px">Alerts</div>
+        <div style="font-size:28px;font-weight:600;color:${totalAlerts>0?'#f87171':'#4ade80'}">${totalAlerts}</div>
+        <div style="font-size:12px;color:#8fa8c4">${red} in alarm now</div>
       </div>
-      <div style="background:#fff;border:0.5px solid var(--border);border-radius:12px;padding:14px;text-align:center">
-        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;font-weight:700">Entries Logged</div>
-        <div style="font-size:30px;font-weight:800;color:${compliancePct>=90?'#00695c':compliancePct>=70?'#f57f17':'#c62828'}">${loggedTotal}</div>
-        <div class="mini">${compliancePct}% of ${expectedTotal} (${daysInRange}d)</div>
+      <div style="background:#132437;border:1px solid #1e3550;border-radius:12px;padding:13px;text-align:center">
+        <div style="font-size:9px;color:#5a7391;text-transform:uppercase;letter-spacing:.5px">Compliance</div>
+        <div style="font-size:28px;font-weight:600;color:${compliancePct>=90?'#4ade80':compliancePct>=70?'#fbbf24':'#f87171'}">${compliancePct}%</div>
+        <div style="font-size:12px;color:#8fa8c4">${loggedTotal}/${expectedTotal} (${daysInRange}d)</div>
       </div>
-      <div style="background:#fff;border:0.5px solid var(--border);border-radius:12px;padding:14px;text-align:center">
-        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;font-weight:700">Status Breakdown</div>
-        <div style="font-size:16px;font-weight:800;margin-top:4px">🟢${green} 🟡${amber} 🔴${red} ⚪${nodata}</div>
-        <div class="mini">of ${numericTags.length} parameters</div>
+      <div style="background:#132437;border:1px solid #1e3550;border-radius:12px;padding:13px;text-align:center">
+        <div style="font-size:9px;color:#5a7391;text-transform:uppercase;letter-spacing:.5px">Status</div>
+        <div style="font-size:15px;font-weight:600;margin-top:6px">🟢${green} 🟡${amber} 🔴${red}</div>
+        <div style="font-size:12px;color:#8fa8c4">⚪${nodata} no data</div>
       </div>
     </div>
-    ${kpiCards ? `<div style="font-size:12px;font-weight:800;color:var(--navy);margin-bottom:6px">📈 KEY PARAMETERS (latest in period)</div>
+    ${gaugeCards ? `<div style="font-size:11px;font-weight:600;color:#8fa8c4;margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px">◆ Live Gauges</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:14px">${gaugeCards}</div>` : ""}
+    ${kpiCards ? `<div style="font-size:11px;font-weight:600;color:#8fa8c4;margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px">◆ Key Parameters</div>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:14px">${kpiCards}</div>` : ""}
-    ${rankedAlerts.length ? `<div style="font-size:12px;font-weight:800;color:var(--alert);margin-bottom:6px">🚨 ALERT SUMMARY (ranked)</div>
-    <div style="background:#fff;border:0.5px solid var(--border);border-radius:12px;padding:10px;margin-bottom:14px">
-      ${rankedAlerts.map(([tid,cnt])=>{ const t=TAGS.find(x=>x.id===tid); return `<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #f0f0f0;font-size:12px"><span>🔴 ${t?t.name:tid}</span><span style="font-weight:800;color:var(--alert)">${cnt}×</span></div>`; }).join('')}
+    ${rankedAlerts.length ? `<div style="font-size:11px;font-weight:600;color:#f87171;margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px">◆ Alert Summary</div>
+    <div style="background:#132437;border:1px solid #1e3550;border-radius:12px;padding:10px;margin-bottom:14px">
+      ${rankedAlerts.map(([tid,cnt])=>{ const t=TAGS.find(x=>x.id===tid); return `<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #1e3550;font-size:12px;color:#e8eef5"><span>🔴 ${t?t.name:tid}</span><span style="font-weight:600;color:#f87171">${cnt}×</span></div>`; }).join('')}
     </div>` : ""}
-    <div style="font-size:12px;font-weight:800;color:var(--navy);margin-bottom:6px">🎛️ ALL PARAMETERS (latest values, traffic light)</div>
-    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px">${tiles}</div>
-    <div style="margin-top:14px;padding:10px;background:#f8f9ff;border-radius:8px;font-size:10px;color:var(--muted);line-height:1.4">
-      ℹ️ <strong>Parameters Within Limits</strong> reflects the latest logged readings vs alarm setpoints in the selected period. 🟢 within limits · 🟡 within 6% of a limit · 🔴 alarm breached · ⚪ no data. This is a logbook health indicator, not a mechanical/predictive health system.
+    <div style="margin-top:6px;padding:10px;background:#132437;border:1px solid #1e3550;border-radius:8px;font-size:10px;color:#5a7391;line-height:1.4">
+      ℹ️ <strong style="color:#8fa8c4">Parameters Within Limits</strong> reflects the latest logged readings vs alarm setpoints in the selected period. This is a logbook health indicator, not a mechanical/predictive health system.
     </div>
   `;
 
+  // Draw dark gauges
+  wrap.querySelectorAll(".dash_gauge").forEach(canvas=>{
+    const tag = TAGS.find(t=>t.id===canvas.dataset.tag);
+    const val = parseFloat(canvas.dataset.val);
+    drawDarkGauge(canvas, tag, val);
+  });
   wrap.querySelectorAll(".dash_spark").forEach(canvas=>{
     const series = canvas.dataset.series.split(",").map(Number).filter(x=>!isNaN(x));
     drawSparkline(canvas, series, canvas.dataset.color);
@@ -11917,6 +11929,34 @@ function renderDashboard(){
 
   if(dashRefreshTimer) clearTimeout(dashRefreshTimer);
   dashRefreshTimer = setTimeout(()=>{ if(document.getElementById("page_dashboard").classList.contains("active")) renderDashboard(); }, 60000);
+}
+
+function drawDarkGauge(canvas, tag, val){
+  const dpr=window.devicePixelRatio||2;
+  canvas.width=120*dpr; canvas.height=88*dpr;
+  canvas.style.width="120px"; canvas.style.height="88px";
+  const ctx=canvas.getContext("2d"); ctx.scale(dpr,dpr);
+  const cx=60,cy=60,R=42;
+  ctx.clearRect(0,0,120,88);
+  const hasMin=tag.min!=null, hasMax=tag.max!=null;
+  const rMin=tag.rangeMin!=null?tag.rangeMin:(hasMin?tag.min*0.85:0);
+  const rMax=tag.rangeMax!=null?tag.rangeMax:(hasMax?tag.max*1.15:100);
+  let vMin=rMin, vMax=rMax;
+  if(!isNaN(val)){ if(val>vMax)vMax=val*1.1; if(val<vMin)vMin=Math.max(0,val*0.9); }
+  const range=vMax-vMin||1;
+  function arc(f,t,c,w){const a1=Math.PI+((f-vMin)/range)*Math.PI,a2=Math.PI+((t-vMin)/range)*Math.PI;ctx.beginPath();ctx.arc(cx,cy,R,a1,a2);ctx.strokeStyle=c;ctx.lineWidth=w;ctx.stroke();}
+  arc(vMin,vMax,"#1e3550",13);
+  if(hasMin&&hasMax){ arc(vMin,tag.min,"#ef4444",13); arc(tag.min,tag.max,"#22c55e",13); arc(tag.max,vMax,"#ef4444",13); }
+  else if(hasMax){ arc(vMin,tag.max,"#22c55e",13); arc(tag.max,vMax,"#ef4444",13); }
+  else if(hasMin){ arc(vMin,tag.min,"#ef4444",13); arc(tag.min,vMax,"#22c55e",13); }
+  if(!isNaN(val)){
+    const pct=Math.max(0,Math.min(1,(val-vMin)/range)),na=Math.PI+pct*Math.PI;
+    const st=tagStatus(tag,val), inA=(st==="high"||st==="low"), nc=inA?"#f87171":"#60a5fa";
+    ctx.beginPath();ctx.moveTo(cx-Math.cos(na)*8,cy-Math.sin(na)*8);ctx.lineTo(cx+Math.cos(na)*(R-6),cy+Math.sin(na)*(R-6));ctx.strokeStyle=nc;ctx.lineWidth=2.5;ctx.lineCap="round";ctx.stroke();
+    ctx.beginPath();ctx.arc(cx,cy,5,0,2*Math.PI);ctx.fillStyle=nc;ctx.fill();
+    ctx.fillStyle=inA?"#f87171":"#e8eef5";ctx.font="600 15px system-ui";ctx.textAlign="center";ctx.fillText(val,cx,cy+21);
+    ctx.fillStyle="#5a7391";ctx.font="400 8px system-ui";ctx.fillText(tag.unit||"",cx,cy+31);
+  }
 }
 
 function drawSparkline(canvas, series, color){
