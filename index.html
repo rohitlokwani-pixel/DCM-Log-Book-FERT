@@ -10419,8 +10419,10 @@ canvas.sigpad{width:100%;height:120px;border:1.5px solid var(--border);border-ra
         <option value="C Shift">C Shift</option>
       </select>
       <button onclick="renderDashboard()" style="padding:6px 12px;margin:0;background:#132437;border:1px solid #1e3550;color:#8fa8c4;border-radius:8px;cursor:pointer">🔄</button>
+      <button onclick="openDashConfig()" style="padding:6px 12px;margin:0;background:#132437;border:1px solid #1e3550;color:#8fa8c4;border-radius:8px;cursor:pointer">⚙️</button>
     </div>
   </div>
+  <div id="dash_config_panel" style="display:none"></div>
   <div id="dash_content"></div>
   </div>
 </div>
@@ -10567,8 +10569,18 @@ canvas.sigpad{width:100%;height:120px;border:1.5px solid var(--border);border-ra
 <!-- DOWNLOAD -->
 <div class="page" id="page_download">
   <div class="card">
+    <div class="ct">⬇️ Complete Data Export (all readings)</div>
+    <p class="mini" style="margin-bottom:8px">Exports every logged entry with all parameters, sorted by date & hour. No data is skipped — empty cells are left blank.</p>
+    <div class="row2" style="margin-bottom:8px">
+      <div><label class="lbl">From (optional)</label><input type="date" id="exp_from"></div>
+      <div><label class="lbl">To (optional)</label><input type="date" id="exp_to"></div>
+    </div>
+    <button class="btn btn-navy" onclick="downloadAllCSV()" style="margin-bottom:6px">📊 Download All Data (CSV)</button>
+    <p class="mini">Leave dates blank to export the entire database. Total entries: <span id="exp_count">—</span></p>
+  </div>
+  <div class="card">
     <div class="ct">⬇️ Month-wise Report</div>
-    <button class="btn btn-navy" onclick="downloadMonthCSV()">📊 Download This Month (CSV)</button>
+    <button class="btn btn-outline" onclick="downloadMonthCSV()">📊 Download This Month (CSV)</button>
   </div>
   <div class="card">
     <div class="ct">🏷️ Tag-wise Full History</div>
@@ -10830,6 +10842,7 @@ async function loadFromSupabase(){
       const rec=Object.fromEntries(sData.map(r=>[r.key,r.value]));
       if(rec.recipients) settings.recipients=rec.recipients;
       if(rec.passwords) customPasswords=rec.passwords;
+      if(rec.dash_configs) dashConfigs=rec.dash_configs;
       if(rec.ranges){ TAGS.forEach(t=>{ if(rec.ranges[t.id]){ t.min=rec.ranges[t.id].min; t.max=rec.ranges[t.id].max; t.rangeMin=rec.ranges[t.id].rangeMin; t.rangeMax=rec.ranges[t.id].rangeMax; t.alertEnabled=rec.ranges[t.id].alertEnabled; settings.ranges[t.id]=rec.ranges[t.id]; } }); }
     }
     supabaseReady=true;
@@ -11765,8 +11778,113 @@ function computeStatValues(){
 
 // ══ MANAGEMENT DASHBOARD (control-room style) ══
 let dashRefreshTimer = null;
+
+// ══ PER-ROLE DASHBOARD CONFIG ══
+let dashConfigs = {}; // {role: {gauges:[], trends:[], kpis:[], sections:{}, refresh:60, dateRange:'7d'}}
+
+function defaultDashConfig(){
+  return {
+    gauges: ["MP_DISCHARGE","DISCHARGE_TEMP","BP_MOTOR","MP_PI8"],
+    trends: ["MP_DISCHARGE","MP_MOTOR","DISCHARGE_PRESS","OIL_IN"],
+    kpis: ["health","alerts","compliance","status"],
+    sections: {banners:true, kpis:true, gauges:true, trends:true, alerts:true},
+    refresh: 60,
+    dateRange: "7d"
+  };
+}
+
+function getDashConfig(){
+  const role = currentRole || "admin";
+  if(!dashConfigs[role]) dashConfigs[role] = defaultDashConfig();
+  return dashConfigs[role];
+}
+
+async function saveDashConfig(){
+  try{
+    await sb.from('settings').upsert({key:'dash_configs',value:dashConfigs,updated_at:new Date().toISOString()},{onConflict:'key'});
+  }catch(e){ console.error("dash config save error", e); }
+}
+
+function openDashConfig(){
+  const panel = document.getElementById("dash_config_panel");
+  if(panel.style.display==="block"){ panel.style.display="none"; return; }
+  panel.style.display="block";
+  const cfg = getDashConfig();
+  const numericTags = TAGS.filter(t=>!(t.type==="text"||t.type==="select"||t.type==="motor"));
+
+  const gaugeChecks = numericTags.map(t=>`<label style="display:flex;align-items:center;gap:6px;font-size:11px;color:#c8d6e5;padding:3px"><input type="checkbox" class="cfg_gauge" value="${t.id}" ${cfg.gauges.includes(t.id)?'checked':''}> ${t.name}</label>`).join("");
+  const trendChecks = numericTags.map(t=>`<label style="display:flex;align-items:center;gap:6px;font-size:11px;color:#c8d6e5;padding:3px"><input type="checkbox" class="cfg_trend" value="${t.id}" ${cfg.trends.includes(t.id)?'checked':''}> ${t.name}</label>`).join("");
+
+  panel.innerHTML = `
+    <div style="background:#132437;border:1px solid #1e3550;border-radius:12px;padding:16px;margin-bottom:14px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <div style="font-size:14px;font-weight:700;color:#e8eef5">⚙️ Dashboard Settings — ${currentRole==="hod"?"HoD":currentRole==="incharge"?"Control Room":"Admin"} view</div>
+        <button onclick="openDashConfig()" style="background:#1e3550;border:none;color:#8fa8c4;padding:4px 10px;border-radius:6px;cursor:pointer">✕ Close</button>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:12px">
+        <div>
+          <div style="font-size:11px;font-weight:700;color:#60a5fa;margin-bottom:6px;text-transform:uppercase">◆ Gauges (pick up to 6)</div>
+          <div style="max-height:160px;overflow-y:auto;background:#0d1b2a;border-radius:8px;padding:6px">${gaugeChecks}</div>
+        </div>
+        <div>
+          <div style="font-size:11px;font-weight:700;color:#60a5fa;margin-bottom:6px;text-transform:uppercase">◆ Trend Cards (pick up to 4)</div>
+          <div style="max-height:160px;overflow-y:auto;background:#0d1b2a;border-radius:8px;padding:6px">${trendChecks}</div>
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:12px">
+        <div>
+          <div style="font-size:11px;font-weight:700;color:#60a5fa;margin-bottom:6px;text-transform:uppercase">◆ Show Sections</div>
+          ${Object.keys(cfg.sections).map(s=>`<label style="display:flex;align-items:center;gap:6px;font-size:11px;color:#c8d6e5;padding:3px"><input type="checkbox" class="cfg_section" value="${s}" ${cfg.sections[s]?'checked':''}> ${s.charAt(0).toUpperCase()+s.slice(1)}</label>`).join("")}
+        </div>
+        <div>
+          <div style="font-size:11px;font-weight:700;color:#60a5fa;margin-bottom:6px;text-transform:uppercase">◆ Options</div>
+          <label style="font-size:11px;color:#c8d6e5;display:block;margin-bottom:4px">Auto-refresh</label>
+          <select id="cfg_refresh" style="width:100%;padding:6px;background:#0d1b2a;border:1px solid #1e3550;color:#e8eef5;border-radius:6px;font-size:11px;margin-bottom:8px">
+            <option value="30" ${cfg.refresh==30?'selected':''}>30 seconds</option>
+            <option value="60" ${cfg.refresh==60?'selected':''}>60 seconds</option>
+            <option value="300" ${cfg.refresh==300?'selected':''}>5 minutes</option>
+            <option value="0" ${cfg.refresh==0?'selected':''}>Off</option>
+          </select>
+          <label style="font-size:11px;color:#c8d6e5;display:block;margin-bottom:4px">Default date range</label>
+          <select id="cfg_range" style="width:100%;padding:6px;background:#0d1b2a;border:1px solid #1e3550;color:#e8eef5;border-radius:6px;font-size:11px">
+            <option value="1d" ${cfg.dateRange=='1d'?'selected':''}>Today</option>
+            <option value="7d" ${cfg.dateRange=='7d'?'selected':''}>Last 7 days</option>
+            <option value="30d" ${cfg.dateRange=='30d'?'selected':''}>Last 30 days</option>
+          </select>
+        </div>
+      </div>
+
+      <button onclick="applyDashConfig()" style="width:100%;padding:10px;background:#0d47a1;border:none;color:#fff;border-radius:8px;font-weight:700;cursor:pointer">💾 Save My Dashboard</button>
+    </div>
+  `;
+}
+
+function applyDashConfig(){
+  const cfg = getDashConfig();
+  const gauges = [...document.querySelectorAll(".cfg_gauge:checked")].map(c=>c.value).slice(0,6);
+  const trends = [...document.querySelectorAll(".cfg_trend:checked")].map(c=>c.value).slice(0,4);
+  const sections = {};
+  document.querySelectorAll(".cfg_section").forEach(c=>{ sections[c.value]=c.checked; });
+  cfg.gauges = gauges.length?gauges:cfg.gauges;
+  cfg.trends = trends;
+  cfg.sections = sections;
+  cfg.refresh = parseInt(document.getElementById("cfg_refresh").value);
+  cfg.dateRange = document.getElementById("cfg_range").value;
+  dashConfigs[currentRole] = cfg;
+  saveDashConfig();
+  document.getElementById("dash_config_panel").style.display="none";
+  // reset date fields so new range applies
+  document.getElementById("dash_from").value="";
+  document.getElementById("dash_to").value="";
+  toast("✅ Dashboard saved for your view");
+  renderDashboard();
+}
+
 function renderDashboard(){
-  // Default date range = last 7 days ending at latest data date (or today)
+  const cfg = getDashConfig();
+  // Default date range from config (today / 7d / 30d)
   const fromEl = document.getElementById("dash_from");
   const toEl = document.getElementById("dash_to");
   const allDates = [...new Set(entries.map(e=>e.date))].sort();
@@ -11774,9 +11892,9 @@ function renderDashboard(){
     toEl.value = allDates.length ? allDates[allDates.length-1] : toDateStr(new Date());
   }
   if(!fromEl.value){
-    // default From = 7 days before To, or earliest data
     const toD = new Date(toEl.value);
-    toD.setDate(toD.getDate()-6);
+    const days = cfg.dateRange==="1d"?0:cfg.dateRange==="30d"?29:6;
+    toD.setDate(toD.getDate()-days);
     const wk = toDateStr(toD);
     fromEl.value = (allDates.length && allDates[0] > wk) ? allDates[0] : wk;
   }
@@ -11852,17 +11970,15 @@ function renderDashboard(){
   const sirenBorder = totalAlerts>0 ? "#7a2a2f" : "#1a5c37";
   const sirenFg = totalAlerts>0 ? "#f87171" : "#4ade80";
 
-  // Gauge cards — key numeric params with min/max
-  const gaugeTagIds = ["MP_DISCHARGE","DISCHARGE_TEMP","BP_MOTOR","MP_PI8","MP_MOTOR","MP_PI7A"];
-  const gaugeTags = gaugeTagIds.map(id=>TAGS.find(t=>t.id===id)).filter(t=>t && latest[t.id]!=null && (t.min!=null||t.max!=null)).slice(0,4);
+  // Gauge cards — from config
+  const gaugeTags = cfg.gauges.map(id=>TAGS.find(t=>t.id===id)).filter(t=>t && latest[t.id]!=null && (t.min!=null||t.max!=null)).slice(0,6);
   const gaugeCards = gaugeTags.map((t,i)=>`<div style="background:#132437;border:1px solid #1e3550;border-radius:12px;padding:8px;text-align:center">
       <div style="font-size:9px;color:#5a7391;text-transform:uppercase;margin-bottom:2px">${t.name}</div>
       <canvas class="dash_gauge" data-tag="${t.id}" data-val="${latest[t.id]}"></canvas>
     </div>`).join("");
 
-  // KPI trend cards (dark)
-  const keyTagIds = ["MP_DISCHARGE","MP_MOTOR","DISCHARGE_PRESS","OIL_IN"];
-  const kpiCards = keyTagIds.map(tid=>{
+  // KPI trend cards — from config
+  const kpiCards = cfg.trends.map(tid=>{
     const t = TAGS.find(x=>x.id===tid); if(!t) return "";
     const v = latest[tid]; if(v==null) return "";
     const st = tagStatus(t, parseFloat(v));
@@ -11877,11 +11993,11 @@ function renderDashboard(){
   }).filter(x=>x).join("");
 
   wrap.innerHTML = `
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+    ${cfg.sections.banners!==false ? `<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
       <div style="background:${bannerBg};border:1px solid ${bannerBorder};border-radius:12px;padding:15px;text-align:center;font-size:15px;font-weight:600;color:${bannerFg}">${bannerText}</div>
       <div style="background:${sirenBg};border:1px solid ${sirenBorder};border-radius:12px;padding:15px;text-align:center;font-size:15px;font-weight:600;color:${sirenFg}">${sirenText}</div>
-    </div>
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:14px">
+    </div>` : ""}
+    ${cfg.sections.kpis!==false ? `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:14px">
       <div style="background:#132437;border:1px solid #1e3550;border-radius:12px;padding:13px;text-align:center">
         <div style="font-size:9px;color:#5a7391;text-transform:uppercase;letter-spacing:.5px">Within Limits</div>
         <div style="font-size:28px;font-weight:600;color:#4ade80">${green}<span style="font-size:13px;color:#5a7391">/${totalMonitored}</span></div>
@@ -11902,12 +12018,12 @@ function renderDashboard(){
         <div style="font-size:15px;font-weight:600;margin-top:6px">🟢${green} 🟡${amber} 🔴${red}</div>
         <div style="font-size:12px;color:#8fa8c4">⚪${nodata} no data</div>
       </div>
-    </div>
-    ${gaugeCards ? `<div style="font-size:11px;font-weight:600;color:#8fa8c4;margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px">◆ Live Gauges</div>
+    </div>` : ""}
+    ${cfg.sections.gauges!==false && gaugeCards ? `<div style="font-size:11px;font-weight:600;color:#8fa8c4;margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px">◆ Live Gauges</div>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:14px">${gaugeCards}</div>` : ""}
-    ${kpiCards ? `<div style="font-size:11px;font-weight:600;color:#8fa8c4;margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px">◆ Key Parameters</div>
+    ${cfg.sections.trends!==false && kpiCards ? `<div style="font-size:11px;font-weight:600;color:#8fa8c4;margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px">◆ Key Parameters</div>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:14px">${kpiCards}</div>` : ""}
-    ${rankedAlerts.length ? `<div style="font-size:11px;font-weight:600;color:#f87171;margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px">◆ Alert Summary</div>
+    ${cfg.sections.alerts!==false && rankedAlerts.length ? `<div style="font-size:11px;font-weight:600;color:#f87171;margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px">◆ Alert Summary</div>
     <div style="background:#132437;border:1px solid #1e3550;border-radius:12px;padding:10px;margin-bottom:14px">
       ${rankedAlerts.map(([tid,cnt])=>{ const t=TAGS.find(x=>x.id===tid); return `<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #1e3550;font-size:12px;color:#e8eef5"><span>🔴 ${t?t.name:tid}</span><span style="font-weight:600;color:#f87171">${cnt}×</span></div>`; }).join('')}
     </div>` : ""}
@@ -11928,7 +12044,9 @@ function renderDashboard(){
   });
 
   if(dashRefreshTimer) clearTimeout(dashRefreshTimer);
-  dashRefreshTimer = setTimeout(()=>{ if(document.getElementById("page_dashboard").classList.contains("active")) renderDashboard(); }, 60000);
+  if(cfg.refresh>0){
+    dashRefreshTimer = setTimeout(()=>{ if(document.getElementById("page_dashboard").classList.contains("active")) renderDashboard(); }, cfg.refresh*1000);
+  }
 }
 
 function drawDarkGauge(canvas, tag, val){
@@ -12404,9 +12522,52 @@ function triggerDownload(text,filename){
   const a=document.createElement("a"); a.href=url; a.download=filename; a.click();
   URL.revokeObjectURL(url);
 }
+// Complete data export — ALL entries, date-sorted, no data missing
+function hourSortKey(hour){
+  // Convert hour to a sort value where shift day starts at 0700
+  // 0700-2300 = same day (700-2300), 0000-0600 = next day (2400-3000)
+  const n = parseInt(hour);
+  return (n>=700) ? n : n+2400;
+}
+function downloadAllCSV(){
+  const from = document.getElementById("exp_from").value;
+  const to = document.getElementById("exp_to").value;
+  let data = [...entries];
+  if(from) data = data.filter(e=>e.date>=from);
+  if(to) data = data.filter(e=>e.date<=to);
+  if(!data.length){ toast("⚠️ No data in selected range"); return; }
+
+  // Sort by date, then by hour in shift-order (0700 first ... 0600 last)
+  data.sort((a,b)=>{
+    if(a.date !== b.date) return a.date.localeCompare(b.date);
+    return hourSortKey(a.hour) - hourSortKey(b.hour);
+  });
+
+  // Full header — all tags, every column
+  const hdrs = ["Date","Hour","Shift","Operator","Area",...TAGS.map(t=>t.name),"Status","Reviewed By","Submitted At","Out-of-range tags","Imported"];
+  const rows = data.map(e=>{
+    const vals = [
+      e.date, e.hour, e.shift, e.operator||"", e.area||"CCP Urea Plant",
+      ...TAGS.map(t=>{ const v=e.readings?.[t.id]; return (v===undefined||v===null)?"":v; }),
+      e.status||"", e.reviewedBy||"",
+      e.createdAt?new Date(e.createdAt).toLocaleString('en-IN'):"",
+      (e.alertTags||[]).map(tid=>{const t=TAGS.find(x=>x.id===tid);return t?t.name:tid;}).join("; "),
+      e.imported?"Yes":"No"
+    ];
+    return vals.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(",");
+  });
+  const filename = "CCP_UreaPlant_AllData"+(from?"_"+from:"")+(to?"_to_"+to:"")+".csv";
+  triggerDownload([hdrs.join(","),...rows].join("\n"), filename);
+  log_audit(currentUser,"Downloaded complete data export",`${data.length} rows${from?" from "+from:""}${to?" to "+to:""}`);
+  toast(`✅ Exported ${data.length} entries (date-sorted)`);
+}
+
 function downloadMonthCSV(){
   const month=new Date().toISOString().slice(0,7);
-  const monthE=entries.filter(e=>e.date?.startsWith(month));
+  const monthE=entries.filter(e=>e.date?.startsWith(month)).sort((a,b)=>{
+    if(a.date!==b.date) return a.date.localeCompare(b.date);
+    return hourSortKey(a.hour)-hourSortKey(b.hour);
+  });
   if(!monthE.length){ toast("No data for this month"); return; }
   const hdrs=["Date","Hour","Shift","Operator",...TAGS.map(t=>t.name),"Status","Out-of-range tags"];
   const rows=monthE.map(e=>[e.date,e.hour,e.shift,e.operator,...TAGS.map(t=>e.readings?.[t.id]??""),e.status,(e.alertTags||[]).join("; ")]
@@ -12422,6 +12583,9 @@ function renderDownloadTags(){
     const dates=[...new Set(entries.map(e=>e.date))].sort().reverse();
     dates.forEach(d=>dateSel.add(new Option(d,d)));
   }
+  // Show total entry count for the export section
+  const countEl=document.getElementById("exp_count");
+  if(countEl) countEl.textContent = entries.length + " entries";
 }
 function generateDailySummary(){
   const date=document.getElementById("summary_date_select").value;
@@ -12451,6 +12615,7 @@ function downloadTagCSV(){
   const tid=document.getElementById("tag_dl_select").value;
   const t=TAGS.find(x=>x.id===tid);
   const rows=entries.filter(e=>e.readings[tid]!==undefined)
+    .sort((a,b)=>{ if(a.date!==b.date) return a.date.localeCompare(b.date); return hourSortKey(a.hour)-hourSortKey(b.hour); })
     .map(e=>[e.date,e.hour,e.shift,e.operator,e.readings[tid]].map(v=>`"${String(v).replace(/"/g,'""')}"`).join(","));
   if(!rows.length){ toast("No history for this tag"); return; }
   triggerDownload(["Date,Hour,Shift,Operator,"+t.name,...rows].join("\n"),"Tag_History_"+t.name.replace(/[^a-zA-Z0-9]+/g,"_")+".csv");
