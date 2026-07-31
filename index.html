@@ -10405,12 +10405,12 @@ canvas.sigpad{width:100%;height:120px;border:1.5px solid var(--border);border-ra
   <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:14px">
     <div style="flex:1;min-width:180px">
       <div style="font-size:18px;font-weight:700;color:#e8eef5">🏭 CCP Urea Plant · Control Room</div>
-      <div style="font-size:11px;color:#5a7391" id="dash_updated">—</div>
+      <div style="font-size:11px;color:#9db4d4" id="dash_updated">—</div>
     </div>
     <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
-      <label style="margin:0;font-size:11px;color:#8fa8c4">From</label>
+      <label style="margin:0;font-size:11px;color:#c5d8ef">From</label>
       <input type="date" id="dash_from" onchange="renderDashboard()" style="padding:6px;border:1px solid #1e3550;background:#132437;color:#e8eef5;border-radius:8px;font-size:12px">
-      <label style="margin:0;font-size:11px;color:#8fa8c4">To</label>
+      <label style="margin:0;font-size:11px;color:#c5d8ef">To</label>
       <input type="date" id="dash_to" onchange="renderDashboard()" style="padding:6px;border:1px solid #1e3550;background:#132437;color:#e8eef5;border-radius:8px;font-size:12px">
       <select id="dash_shift" onchange="renderDashboard()" style="padding:6px;border:1px solid #1e3550;background:#132437;color:#e8eef5;border-radius:8px;font-size:12px">
         <option value="all">All Shifts</option>
@@ -10418,8 +10418,8 @@ canvas.sigpad{width:100%;height:120px;border:1.5px solid var(--border);border-ra
         <option value="B Shift">B Shift</option>
         <option value="C Shift">C Shift</option>
       </select>
-      <button onclick="renderDashboard()" style="padding:6px 12px;margin:0;background:#132437;border:1px solid #1e3550;color:#8fa8c4;border-radius:8px;cursor:pointer">🔄</button>
-      <button onclick="openDashConfig()" style="padding:6px 12px;margin:0;background:#132437;border:1px solid #1e3550;color:#8fa8c4;border-radius:8px;cursor:pointer">⚙️</button>
+      <button onclick="renderDashboard()" style="padding:6px 12px;margin:0;background:#132437;border:1px solid #1e3550;color:#c5d8ef;border-radius:8px;cursor:pointer">🔄</button>
+      <button onclick="openDashConfig()" style="padding:6px 12px;margin:0;background:#132437;border:1px solid #1e3550;color:#c5d8ef;border-radius:8px;cursor:pointer">⚙️</button>
     </div>
   </div>
   <div id="dash_config_panel" style="display:none"></div>
@@ -11819,7 +11819,7 @@ function openDashConfig(){
     <div style="background:#132437;border:1px solid #1e3550;border-radius:12px;padding:16px;margin-bottom:14px">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
         <div style="font-size:14px;font-weight:700;color:#e8eef5">⚙️ Dashboard Settings — ${currentRole==="hod"?"HoD":currentRole==="incharge"?"Control Room":"Admin"} view</div>
-        <button onclick="openDashConfig()" style="background:#1e3550;border:none;color:#8fa8c4;padding:4px 10px;border-radius:6px;cursor:pointer">✕ Close</button>
+        <button onclick="openDashConfig()" style="background:#1e3550;border:none;color:#c5d8ef;padding:4px 10px;border-radius:6px;cursor:pointer">✕ Close</button>
       </div>
 
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:12px">
@@ -11914,10 +11914,10 @@ function renderDashboard(){
   const wrap = document.getElementById("dash_content");
 
   if(!rangeEntries.length){
-    wrap.innerHTML = `<div style="text-align:center;padding:40px;color:#5a7391">
+    wrap.innerHTML = `<div style="text-align:center;padding:40px;color:#9db4d4">
       <div style="font-size:40px">📭</div>
-      <div style="font-size:14px;margin-top:8px;color:#8fa8c4">No data between ${fromDate} and ${toDate}${selShift!=="all"?" ("+selShift+")":""}</div>
-      <div style="font-size:11px;margin-top:4px;color:#5a7391">Try a wider date range or different shift. ${allDates.length?"Data exists for: "+allDates[0]+" to "+allDates[allDates.length-1]:"No entries in system yet."}</div>
+      <div style="font-size:14px;margin-top:8px;color:#c5d8ef">No data between ${fromDate} and ${toDate}${selShift!=="all"?" ("+selShift+")":""}</div>
+      <div style="font-size:11px;margin-top:4px;color:#9db4d4">Try a wider date range or different shift. ${allDates.length?"Data exists for: "+allDates[0]+" to "+allDates[allDates.length-1]:"No entries in system yet."}</div>
     </div>`;
     return;
   }
@@ -11973,7 +11973,7 @@ function renderDashboard(){
   // Gauge cards — from config
   const gaugeTags = cfg.gauges.map(id=>TAGS.find(t=>t.id===id)).filter(t=>t && latest[t.id]!=null && (t.min!=null||t.max!=null)).slice(0,6);
   const gaugeCards = gaugeTags.map((t,i)=>`<div style="background:#132437;border:1px solid #1e3550;border-radius:12px;padding:8px;text-align:center">
-      <div style="font-size:9px;color:#5a7391;text-transform:uppercase;margin-bottom:2px">${t.name}</div>
+      <div style="font-size:9px;color:#9db4d4;text-transform:uppercase;margin-bottom:2px">${t.name}</div>
       <canvas class="dash_gauge" data-tag="${t.id}" data-val="${latest[t.id]}"></canvas>
     </div>`).join("");
 
@@ -11985,10 +11985,10 @@ function renderDashboard(){
     const color = (st==="high"||st==="low") ? "#f87171" : "#60a5fa";
     const series = [...rangeEntries].sort((a,b)=>(a.date+a.hour).localeCompare(b.date+b.hour)).map(e=>e.readings[tid]).filter(x=>x!=null&&!isNaN(parseFloat(x))).map(Number);
     return `<div style="background:#132437;border:1px solid #1e3550;border-radius:12px;padding:10px">
-      <div style="font-size:9px;color:#5a7391;text-transform:uppercase">${t.name}</div>
-      <div style="font-size:22px;font-weight:600;color:${color};margin:2px 0">${v}<span style="font-size:10px;color:#5a7391;font-weight:400"> ${t.unit}</span></div>
+      <div style="font-size:10px;color:#9db4d4;text-transform:uppercase;font-weight:600">${t.name}</div>
+      <div style="font-size:22px;font-weight:600;color:${color};margin:2px 0">${v}<span style="font-size:10px;color:#9db4d4;font-weight:400"> ${t.unit}</span></div>
       <canvas class="dash_spark" data-series="${series.join(',')}" data-color="${color}" width="140" height="28" style="width:100%;height:28px"></canvas>
-      <div style="font-size:9px;color:#5a7391;margin-top:2px">${rangeText(t)}</div>
+      <div style="font-size:9px;color:#9db4d4;margin-top:2px">${rangeText(t)}</div>
     </div>`;
   }).filter(x=>x).join("");
 
@@ -11999,36 +11999,36 @@ function renderDashboard(){
     </div>` : ""}
     ${cfg.sections.kpis!==false ? `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:14px">
       <div style="background:#132437;border:1px solid #1e3550;border-radius:12px;padding:13px;text-align:center">
-        <div style="font-size:9px;color:#5a7391;text-transform:uppercase;letter-spacing:.5px">Within Limits</div>
-        <div style="font-size:28px;font-weight:600;color:#4ade80">${green}<span style="font-size:13px;color:#5a7391">/${totalMonitored}</span></div>
-        <div style="font-size:12px;color:#8fa8c4">${healthPct}%</div>
+        <div style="font-size:10px;color:#9db4d4;text-transform:uppercase;letter-spacing:.5px;font-weight:600">Within Limits</div>
+        <div style="font-size:28px;font-weight:600;color:#4ade80">${green}<span style="font-size:14px;color:#c5d8ef">/${totalMonitored}</span></div>
+        <div style="font-size:12px;color:#c5d8ef">${healthPct}%</div>
       </div>
       <div style="background:#132437;border:1px solid #1e3550;border-radius:12px;padding:13px;text-align:center">
-        <div style="font-size:9px;color:#5a7391;text-transform:uppercase;letter-spacing:.5px">Alerts</div>
+        <div style="font-size:10px;color:#9db4d4;text-transform:uppercase;letter-spacing:.5px;font-weight:600">Alerts</div>
         <div style="font-size:28px;font-weight:600;color:${totalAlerts>0?'#f87171':'#4ade80'}">${totalAlerts}</div>
-        <div style="font-size:12px;color:#8fa8c4">${red} in alarm now</div>
+        <div style="font-size:12px;color:#c5d8ef">${red} in alarm now</div>
       </div>
       <div style="background:#132437;border:1px solid #1e3550;border-radius:12px;padding:13px;text-align:center">
-        <div style="font-size:9px;color:#5a7391;text-transform:uppercase;letter-spacing:.5px">Compliance</div>
+        <div style="font-size:10px;color:#9db4d4;text-transform:uppercase;letter-spacing:.5px;font-weight:600">Compliance</div>
         <div style="font-size:28px;font-weight:600;color:${compliancePct>=90?'#4ade80':compliancePct>=70?'#fbbf24':'#f87171'}">${compliancePct}%</div>
-        <div style="font-size:12px;color:#8fa8c4">${loggedTotal}/${expectedTotal} (${daysInRange}d)</div>
+        <div style="font-size:12px;color:#c5d8ef">${loggedTotal}/${expectedTotal} (${daysInRange}d)</div>
       </div>
       <div style="background:#132437;border:1px solid #1e3550;border-radius:12px;padding:13px;text-align:center">
-        <div style="font-size:9px;color:#5a7391;text-transform:uppercase;letter-spacing:.5px">Status</div>
+        <div style="font-size:10px;color:#9db4d4;text-transform:uppercase;letter-spacing:.5px;font-weight:600">Status</div>
         <div style="font-size:15px;font-weight:600;margin-top:6px">🟢${green} 🟡${amber} 🔴${red}</div>
-        <div style="font-size:12px;color:#8fa8c4">⚪${nodata} no data</div>
+        <div style="font-size:12px;color:#c5d8ef">⚪${nodata} no data</div>
       </div>
     </div>` : ""}
-    ${cfg.sections.gauges!==false && gaugeCards ? `<div style="font-size:11px;font-weight:600;color:#8fa8c4;margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px">◆ Live Gauges</div>
+    ${cfg.sections.gauges!==false && gaugeCards ? `<div style="font-size:11px;font-weight:600;color:#c5d8ef;margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px">◆ Live Gauges</div>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:14px">${gaugeCards}</div>` : ""}
-    ${cfg.sections.trends!==false && kpiCards ? `<div style="font-size:11px;font-weight:600;color:#8fa8c4;margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px">◆ Key Parameters</div>
+    ${cfg.sections.trends!==false && kpiCards ? `<div style="font-size:11px;font-weight:600;color:#c5d8ef;margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px">◆ Key Parameters</div>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:14px">${kpiCards}</div>` : ""}
     ${cfg.sections.alerts!==false && rankedAlerts.length ? `<div style="font-size:11px;font-weight:600;color:#f87171;margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px">◆ Alert Summary</div>
     <div style="background:#132437;border:1px solid #1e3550;border-radius:12px;padding:10px;margin-bottom:14px">
       ${rankedAlerts.map(([tid,cnt])=>{ const t=TAGS.find(x=>x.id===tid); return `<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #1e3550;font-size:12px;color:#e8eef5"><span>🔴 ${t?t.name:tid}</span><span style="font-weight:600;color:#f87171">${cnt}×</span></div>`; }).join('')}
     </div>` : ""}
-    <div style="margin-top:6px;padding:10px;background:#132437;border:1px solid #1e3550;border-radius:8px;font-size:10px;color:#5a7391;line-height:1.4">
-      ℹ️ <strong style="color:#8fa8c4">Parameters Within Limits</strong> reflects the latest logged readings vs alarm setpoints in the selected period. This is a logbook health indicator, not a mechanical/predictive health system.
+    <div style="margin-top:6px;padding:10px;background:#132437;border:1px solid #1e3550;border-radius:8px;font-size:10px;color:#9db4d4;line-height:1.4">
+      ℹ️ <strong style="color:#c5d8ef">Parameters Within Limits</strong> reflects the latest logged readings vs alarm setpoints in the selected period. This is a logbook health indicator, not a mechanical/predictive health system.
     </div>
   `;
 
@@ -12073,11 +12073,12 @@ function drawDarkGauge(canvas, tag, val){
     ctx.beginPath();ctx.moveTo(cx-Math.cos(na)*8,cy-Math.sin(na)*8);ctx.lineTo(cx+Math.cos(na)*(R-6),cy+Math.sin(na)*(R-6));ctx.strokeStyle=nc;ctx.lineWidth=2.5;ctx.lineCap="round";ctx.stroke();
     ctx.beginPath();ctx.arc(cx,cy,5,0,2*Math.PI);ctx.fillStyle=nc;ctx.fill();
     ctx.fillStyle=inA?"#f87171":"#e8eef5";ctx.font="600 15px system-ui";ctx.textAlign="center";ctx.fillText(val,cx,cy+21);
-    ctx.fillStyle="#5a7391";ctx.font="400 8px system-ui";ctx.fillText(tag.unit||"",cx,cy+31);
+    ctx.fillStyle="#b8cce4";ctx.font="600 9px system-ui";ctx.fillText(tag.unit||"",cx,cy+31);
   }
 }
 
 function drawSparkline(canvas, series, color){
+  series = series.map(Number).filter(v=>!isNaN(v));
   const dpr = window.devicePixelRatio||2;
   const w = canvas.clientWidth||140, h = 30;
   canvas.width = w*dpr; canvas.height = h*dpr;
@@ -12095,7 +12096,12 @@ function drawSparkline(canvas, series, color){
   // line
   ctx.beginPath();
   series.forEach((v,i)=>{ const x=i*step, y=h-4-((v-min)/range)*(h-8); i?ctx.lineTo(x,y):ctx.moveTo(x,y); });
-  ctx.strokeStyle = color; ctx.lineWidth=1.5; ctx.stroke();
+  ctx.strokeStyle = color; ctx.lineWidth=1.8; ctx.stroke();
+  // dots at each point (only if not too many)
+  if(series.length<=30){
+    series.forEach((v,i)=>{ const x=i*step, y=h-4-((v-min)/range)*(h-8);
+      ctx.beginPath(); ctx.arc(x,y,1.8,0,2*Math.PI); ctx.fillStyle=color; ctx.fill(); });
+  }
 }
 
 function renderStatCards(){
@@ -12382,11 +12388,13 @@ function renderTrendChart(){
     datasets = selectedTrendTags.map((tid,i)=>{
       const t=TAGS.find(x=>x.id===tid);
       const data=days.map(date=>{
-        const dayE=rangeEntries.filter(e=>e.date===date&&e.readings[tid]!==undefined);
+        const dayE=rangeEntries.filter(e=>e.date===date&&e.readings[tid]!==undefined&&e.readings[tid]!=="");
         if(!dayE.length) return null;
-        return +(dayE.reduce((a,e)=>a+e.readings[tid],0)/dayE.length).toFixed(2);
+        const nums=dayE.map(e=>parseFloat(e.readings[tid])).filter(n=>!isNaN(n));
+        if(!nums.length) return null;
+        return +(nums.reduce((a,n)=>a+n,0)/nums.length).toFixed(2);
       });
-      return {label:t.name+" (avg)",data,borderColor:colors[i%colors.length],backgroundColor:colors[i%colors.length]+"22",fill:true,tension:.35,spanGaps:true,pointRadius:3,pointHoverRadius:6,borderWidth:2};
+      return {label:t.name+" (avg)",data,borderColor:colors[i%colors.length],backgroundColor:colors[i%colors.length]+"22",fill:true,tension:.35,spanGaps:true,pointRadius:3,pointHoverRadius:6,borderWidth:2.5,showLine:true};
     });
   } else {
     // Raw hourly mode — one point per entry
@@ -12394,10 +12402,12 @@ function renderTrendChart(){
     datasets = selectedTrendTags.map((tid,i)=>{
       const t=TAGS.find(x=>x.id===tid);
       const data=labels.map(lbl=>{
-        const match=rangeEntries.find(e=>(e.date+" "+e.hour)===lbl && e.readings[tid]!==undefined);
-        return match?match.readings[tid]:null;
+        const match=rangeEntries.find(e=>(e.date+" "+e.hour)===lbl && e.readings[tid]!==undefined && e.readings[tid]!=="");
+        if(!match) return null;
+        const num = parseFloat(match.readings[tid]);
+        return isNaN(num) ? null : num;
       });
-      return {label:t.name,data,borderColor:colors[i%colors.length],backgroundColor:"transparent",tension:.25,spanGaps:true,pointRadius:dayCount>15?1.5:dayCount>3?2:3,pointHoverRadius:5,borderWidth:2};
+      return {label:t.name,data,borderColor:colors[i%colors.length],backgroundColor:"transparent",fill:false,tension:.3,spanGaps:true,pointRadius:dayCount>15?1.5:dayCount>3?2.5:3,pointHoverRadius:5,borderWidth:2.5,showLine:true};
     });
   }
   const pxPerPoint = trendMode==="avg" ? (dayCount<=7?60:dayCount<=15?40:25) : (dayCount<=1?60:dayCount<=7?18:8);
