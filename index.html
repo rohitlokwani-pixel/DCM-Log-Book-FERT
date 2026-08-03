@@ -12397,8 +12397,13 @@ function renderTrendChart(){
       return {label:t.name+" (avg)",data,borderColor:colors[i%colors.length],backgroundColor:colors[i%colors.length]+"22",fill:true,tension:.35,spanGaps:true,pointRadius:3,pointHoverRadius:6,borderWidth:2.5,showLine:true};
     });
   } else {
-    // Raw hourly mode — one point per entry
-    labels = [...new Set(rangeEntries.map(e=>e.date+" "+e.hour))];
+    // Raw hourly mode — one point per entry, SORTED chronologically
+    const hsk = h=>{ const n=parseInt(h); return (n>=700)?n:n+2400; };
+    labels = [...new Set(rangeEntries.map(e=>e.date+" "+e.hour))].sort((a,b)=>{
+      const [da,ha]=a.split(" "), [db,hb]=b.split(" ");
+      if(da!==db) return da.localeCompare(db);
+      return hsk(ha)-hsk(hb);
+    });
     datasets = selectedTrendTags.map((tid,i)=>{
       const t=TAGS.find(x=>x.id===tid);
       const data=labels.map(lbl=>{
@@ -12407,7 +12412,7 @@ function renderTrendChart(){
         const num = parseFloat(match.readings[tid]);
         return isNaN(num) ? null : num;
       });
-      return {label:t.name,data,borderColor:colors[i%colors.length],backgroundColor:"transparent",fill:false,tension:.3,spanGaps:true,pointRadius:dayCount>15?1.5:dayCount>3?2.5:3,pointHoverRadius:5,borderWidth:2.5,showLine:true};
+      return {label:t.name,data,borderColor:colors[i%colors.length],backgroundColor:"transparent",fill:false,tension:.3,spanGaps:true,pointRadius:dayCount>15?0:dayCount>7?1.5:2.5,pointHoverRadius:5,borderWidth:3,showLine:true};
     });
   }
   const pxPerPoint = trendMode==="avg" ? (dayCount<=7?60:dayCount<=15?40:25) : (dayCount<=1?60:dayCount<=7?18:8);
