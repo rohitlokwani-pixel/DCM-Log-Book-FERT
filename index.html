@@ -10692,6 +10692,21 @@ canvas.sigpad{width:100%;height:120px;border:1.5px solid var(--border);border-ra
   </div>
 </div>
 
+<!-- SHIFT APPROVE MODAL -->
+<div id="shiftapprove_modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9000;align-items:center;justify-content:center;padding:20px">
+  <div style="background:#fff;border-radius:16px;padding:20px;width:100%;max-width:360px">
+    <div id="shiftapprove_title" style="font-size:15px;font-weight:700;color:var(--ok);margin-bottom:10px">Approve Shift?</div>
+    <p id="shiftapprove_msg" style="font-size:12px;color:var(--muted);margin-bottom:12px"></p>
+    <label class="lbl">Shift Incharge Name</label>
+    <input type="text" id="shiftapprove_name" placeholder="Enter your name" style="margin-bottom:12px">
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-outline" style="margin-bottom:0;flex:1" onclick="closeModal('shiftapprove_modal')">No, go back</button>
+      <button class="btn btn-green" style="margin-bottom:0;flex:1" onclick="confirmShiftApprove()">✅ Yes, Approve</button>
+    </div>
+    <p class="mini" style="margin-top:8px;text-align:center">Edit any value in the entries above before approving if needed.</p>
+  </div>
+</div>
+
 <!-- REJECT MODAL -->
 <div id="reject_modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9000;align-items:center;justify-content:center;padding:20px">
   <div style="background:#fff;border-radius:16px;padding:20px;width:100%;max-width:340px">
@@ -10732,6 +10747,8 @@ const SECTIONS = [
   {id:"CCP_FIELD", label:"⚙️ C.C. Pump (Field)"},
 ];
 
+const LEAK_OPTIONS = ["Nil","DD","Slight","Heavy"];
+const LEAK_SEVERITY = {"Nil":0,"DD":1,"Slight":2,"Heavy":3};
 const TAGS = [
   // LUBE OIL SYSTEM
   {id:"AUX_AMPS", section:"LUBE", name:"Aux Oil Pump", unit:"Amps", min:0, max:4},
@@ -10762,9 +10779,9 @@ const TAGS = [
   {id:"SFCF_1", section:"CCP_FIELD", name:"Seal Flush Cond. Filter No.1 Out", unit:"Kg/cm²g", min:5, max:8},
   {id:"SFCF_2", section:"CCP_FIELD", name:"Seal Flush Cond. Filter No.2 Out", unit:"Kg/cm²g", min:5, max:8},
   {id:"SFCF_DIFF", section:"CCP_FIELD", name:"Seal Flush Cond. Filter Diff", unit:"Kg/cm²", min:null, max:1.0},
-  {id:"LEAK_BOOSTER", section:"CCP_FIELD", name:"Seal Leakage — Booster Pump", unit:"", type:"text", min:null, max:null},
-  {id:"LEAK_MAIN_LP", section:"CCP_FIELD", name:"Seal Leakage — Main Pump (LP Side)", unit:"", type:"text", min:null, max:null},
-  {id:"LEAK_MAIN_HP", section:"CCP_FIELD", name:"Seal Leakage — Main Pump (HP Side)", unit:"", type:"text", min:null, max:null},
+  {id:"LEAK_BOOSTER", section:"CCP_FIELD", name:"Seal Leakage — Booster Pump", unit:"", type:"leak", min:null, max:null},
+  {id:"LEAK_MAIN_LP", section:"CCP_FIELD", name:"Seal Leakage — Main Pump (LP Side)", unit:"", type:"leak", min:null, max:null},
+  {id:"LEAK_MAIN_HP", section:"CCP_FIELD", name:"Seal Leakage — Main Pump (HP Side)", unit:"", type:"leak", min:null, max:null},
 ];
 
 const HOURS = ["0700","0800","0900","1000","1100","1200","1300","1400","1500","1600","1700","1800","1900","2000","2100","2200","2300","0000","0100","0200","0300","0400","0500","0600"];
@@ -10783,6 +10800,12 @@ function rangeText(tag){
   return "log only ("+tag.unit+")";
 }
 function tagStatus(tag, val){
+  // Leakage: Nil/DD = ok, Slight = warn (low), Heavy = alarm (high)
+  if(tag.type==="leak"){
+    if(val==="Heavy") return "high";
+    if(val==="Slight") return "low";
+    return "ok"; // Nil, DD
+  }
   if(isNaN(val)) return null;
   // If alerts disabled for this tag, always return ok (no alert)
   if(tag.alertEnabled === false) return "ok";
@@ -10834,7 +10857,7 @@ async function loadFromSupabase(){
   try{
     const {data:eData,error:eErr}=await sb.from('hourly_entries').select('*').order('date',{ascending:false}).order('hour',{ascending:false});
     if(eErr) throw eErr;
-    entries=(eData||[]).map(r=>({id:r.id,date:r.date,hour:r.hour,shift:r.shift,operator:r.operator,readings:r.readings||{},alertTags:r.alert_tags||[],remarks:r.remarks||'',status:r.status||'Pending Review',reviewedBy:r.reviewed_by,reviewedAt:r.reviewed_at,rejectComment:r.reject_comment,imported:r.imported||false,qrScannedAt:r.qr_scanned_at,createdAt:r.created_at}));
+    entries=(eData||[]).map(r=>({id:r.id,date:r.date,hour:r.hour,shift:r.shift,operator:r.operator,readings:r.readings||{},alertTags:r.alert_tags||[],remarks:r.remarks||'',status:r.status||'Pending Review',reviewedBy:r.reviewed_by,reviewedAt:r.reviewed_at,editedBy:r.edited_by,rejectComment:r.reject_comment,imported:r.imported||false,qrScannedAt:r.qr_scanned_at,createdAt:r.created_at}));
     const {data:aData}=await sb.from('audit_log').select('*').order('ts',{ascending:false}).limit(200);
     auditLog=(aData||[]).map(r=>({ts:r.ts,actor:r.actor,action:r.action,detail:r.detail||''}));
     const {data:sData}=await sb.from('settings').select('*');
@@ -11188,6 +11211,15 @@ function buildEntrySections(){
             <option value="">-- Select --</option>${opts}
           </select>
         </div>`;
+      } else if(type === "leak"){
+        // Leakage dropdown: Nil, DD, Slight, Heavy
+        const leakOpts = LEAK_OPTIONS.map(o=>`<option value="${o}" ${prevVal===o?'selected':''}>${o}</option>`).join("");
+        html += `<div class="gauge-field" id="field_${t.id}">
+          <div class="gauge-name">${t.name}</div>
+          <select id="v_${t.id}" onchange="checkFieldInput('${t.id}')" style="width:100%;padding:9px;border:1.5px solid var(--border);border-radius:8px;font-size:14px">
+            <option value="">-- Select --</option>${leakOpts}
+          </select>
+        </div>`;
       } else if(type === "text"){
         // Free text (Seal Leakages)
         html += `<div class="gauge-field" id="field_${t.id}">
@@ -11297,8 +11329,8 @@ async function submitHourEntry(){
     const el = document.getElementById("v_"+t.id);
     const v = el?.value;
 
-    if(type === "text" || type === "select"){
-      // Text and select fields — store as string, required
+    if(type === "text" || type === "select" || type === "leak"){
+      // Text, select, and leakage fields — store as string, required
       if(!v || v===""){ missing.push(t.name); } else { readings[t.id]=v; }
     } else if(type === "motor"){
       // Motor field — spare motors don't need a value
@@ -11317,7 +11349,8 @@ async function submitHourEntry(){
   if(missing.length){ toast(`⚠️ Fill all fields (${missing.length} missing) — check each section tab`); return; }
 
   const alertTags = TAGS.filter(t=>{ 
-    if(t.type==="text"||t.type==="select"||t.type==="motor") return false; // no alerts on non-numeric
+    if(t.type==="text"||t.type==="select"||t.type==="motor") return false; // no alerts on these
+    if(t.type==="leak"){ const st=tagStatus(t,readings[t.id]); return st==="high"; } // only Heavy leak alerts
     const st=tagStatus(t,readings[t.id]); return st==="high"||st==="low"; 
   }).map(t=>t.id);
 
@@ -11539,74 +11572,168 @@ function renderPendingReviews(){
   if(reviewFilter==="pending") filtered = entries.filter(e=>e.status==="Pending Review");
   else if(reviewFilter==="approved") filtered = entries.filter(e=>e.status==="Reviewed");
   else filtered = entries.filter(e=>e.status==="Rejected");
-  filtered = filtered.sort((a,b)=>a.date.localeCompare(b.date)||a.hour.localeCompare(b.hour));
-  if(!filtered.length){ 
+
+  if(!filtered.length){
     const msgs = {pending:"No entries awaiting review 🎉", approved:"No approved entries yet", rejected:"No rejected entries"};
-    wrap.innerHTML=`<div class="empty">${msgs[reviewFilter]}</div>`; 
-    return; 
+    wrap.innerHTML=`<div class="empty">${msgs[reviewFilter]}</div>`;
+    return;
   }
-  wrap.innerHTML=filtered.map(e=>{
-    // Show ALL readings organized by section
-    const sectionHtml = SECTIONS.map(s=>{
-      const secTags = TAGS.filter(t=>t.section===s.id);
-      const rows = secTags.map(t=>{
-        const v = e.readings?.[t.id];
-        if(v===undefined||v===null) return '';
-        const st = tagStatus(t,v);
-        const hot = st==='high'||st==='low';
-        const statusBadge = hot ? `<span class="badge b-alert">${st==='high'?'HIGH':'LOW'}</span>` : '';
-        return `<tr>
-          <td class="k" style="font-size:10px">${t.name}</td>
-          <td class="v ${hot?'hot':''}" style="text-align:right;white-space:nowrap">${v} ${t.unit} ${statusBadge}</td>
-        </tr>`;
+
+  // Group by shift = date + shift
+  const groups = {};
+  filtered.forEach(e=>{ const key=e.date+" | "+e.shift; (groups[key]=groups[key]||[]).push(e); });
+  const sortedKeys = Object.keys(groups).sort((a,b)=>b.localeCompare(a)); // newest first
+
+  const hsk = h=>{ const n=parseInt(h); return (n>=700)?n:n+2400; };
+
+  wrap.innerHTML = sortedKeys.map(key=>{
+    const shiftEntries = groups[key].sort((a,b)=>hsk(a.hour)-hsk(b.hour));
+    const [date, shift] = key.split(" | ");
+    const totalAlerts = shiftEntries.reduce((s,e)=>s+(e.alertTags?.length||0),0);
+    const gid = key.replace(/[^a-zA-Z0-9]/g,"_");
+
+    // Rows for each hour
+    const hourRows = shiftEntries.map(e=>{
+      const alertBadge = e.alertTags?.length ? `<span class="badge b-alert" style="font-size:8px">🚨${e.alertTags.length}</span>` : '';
+      // build a compact readings table
+      const readingRows = TAGS.map(t=>{
+        const v=e.readings?.[t.id];
+        if(v===undefined||v===null||v==="") return '';
+        const st=tagStatus(t,v); const hot=st==='high'||st==='low';
+        return `<tr><td class="k" style="font-size:9px">${t.name}</td><td class="v ${hot?'hot':''}" style="text-align:right;font-size:10px">${reviewFilter==="pending"?`<input data-eid="${e.id}" data-tid="${t.id}" value="${v}" style="width:70px;text-align:right;border:1px solid var(--border);border-radius:4px;padding:2px 4px;font-size:10px" class="edit_val"> ${t.unit}`:`${v} ${t.unit}`} ${hot?`<span class="badge b-alert" style="font-size:7px">${st.toUpperCase()}</span>`:''}</td></tr>`;
       }).filter(r=>r).join('');
-      if(!rows) return '';
-      return `<div style="margin-bottom:6px">
-        <div style="font-size:9px;font-weight:800;color:var(--blue);text-transform:uppercase;padding:3px 0;border-bottom:1px solid var(--border);margin-bottom:4px">${s.label}</div>
-        <table class="mt">${rows}</table>
-      </div>`;
+      return `<details style="margin-bottom:4px;border:1px solid var(--border);border-radius:8px;padding:6px">
+        <summary style="font-size:11px;font-weight:700;color:var(--blue);cursor:pointer">🕐 ${e.hour.slice(0,2)}:${e.hour.slice(2)} hrs · 👷 ${e.operator} ${alertBadge} ${e.imported?'<span style="font-size:8px;color:#283593">📥</span>':''}</summary>
+        <table class="mt" style="margin-top:6px">${readingRows}</table>
+        <div style="margin-top:4px"><input data-eid="${e.id}" class="edit_remark" placeholder="Add remark (optional)" value="${e.remarks||''}" style="width:100%;border:1px solid var(--border);border-radius:4px;padding:4px;font-size:10px"></div>
+      </details>`;
     }).join('');
 
-    const alertSummary = e.alertTags?.length
-      ? `<div style="background:#fff5f5;border:1px solid var(--alert);border-radius:8px;padding:8px;margin-bottom:8px;font-size:11px;color:var(--alert);font-weight:700">
-          🚨 ${e.alertTags.length} reading(s) out of range: ${e.alertTags.map(tid=>{ const t=TAGS.find(x=>x.id===tid); return t?t.name:tid; }).join(', ')}
-         </div>` : '';
+    let footer = '';
+    if(reviewFilter==="pending"){
+      footer = `<div style="margin-top:10px;padding-top:10px;border-top:2px solid var(--border)">
+        <div class="mini" style="margin-bottom:6px">📋 ${shiftEntries.length} entries in this shift${totalAlerts?` · <span style="color:var(--alert);font-weight:700">🚨 ${totalAlerts} alerts</span>`:''}</div>
+        <button class="btn btn-green" style="margin-bottom:0;width:100%" onclick="approveShift('${gid}','${date}','${shift}')">✅ Approve ${shift} — ${date}</button>
+      </div>`;
+    } else if(reviewFilter==="approved"){
+      const first = shiftEntries[0];
+      const editedNote = first.editedBy ? ` &amp; Edited` : '';
+      footer = `<div style="background:#f0fff4;border:1px solid var(--ok);border-radius:8px;padding:8px;margin-top:8px;font-size:11px;color:var(--ok)">
+        ✅ Approved${editedNote} by <strong>${first.reviewedBy||'Shift Incharge'}</strong> ${first.reviewedAt?'on '+new Date(first.reviewedAt).toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}):''}
+      </div>`;
+    } else {
+      footer = `<div style="background:#fff5f5;border:1px solid var(--alert);border-radius:8px;padding:8px;margin-top:8px;font-size:11px;color:var(--alert)">
+        ❌ Rejected by <strong>${shiftEntries[0].reviewedBy||'Shift Incharge'}</strong>
+      </div>`;
+    }
 
-    return `<div class="rc">
+    return `<div class="rc" id="shift_${gid}">
       <div class="rh">
         <div style="flex:1">
-          <div class="rt">${e.date} · ${e.hour.slice(0,2)}:${e.hour.slice(2)} hrs</div>
+          <div class="rt">📅 ${date} · ${shift}</div>
           <div class="rs" style="display:flex;flex-wrap:wrap;gap:4px;margin-top:3px">
-            <span style="background:#e8f4fd;color:#0d47a1;font-size:9px;font-weight:700;padding:1px 6px;border-radius:8px">🏭 ${e.area||'CCP Urea Plant'}</span>
-            <span style="background:#e0f2f1;color:#00695c;font-size:9px;font-weight:700;padding:1px 6px;border-radius:8px">⏰ ${e.shift}</span>
-            <span style="background:#f3e5f5;color:#6a1b9a;font-size:9px;font-weight:700;padding:1px 6px;border-radius:8px">👷 ${e.operator}</span>
-            ${e.createdAt?`<span style="background:#fff8e1;color:#e65100;font-size:9px;font-weight:700;padding:1px 6px;border-radius:8px">🕐 ${new Date(e.createdAt).toLocaleString('en-IN',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',hour12:true})}</span>`:''}
-            ${e.imported?`<span style="background:#e8eaf6;color:#283593;font-size:9px;font-weight:700;padding:1px 6px;border-radius:8px">📥 Imported by Admin</span>`:''}
+            <span style="background:#e8f4fd;color:#0d47a1;font-size:9px;font-weight:700;padding:1px 6px;border-radius:8px">🏭 CCP Urea Plant</span>
+            <span style="background:#e0f2f1;color:#00695c;font-size:9px;font-weight:700;padding:1px 6px;border-radius:8px">📋 ${shiftEntries.length} hrs logged</span>
           </div>
         </div>
-        ${e.alertTags?.length?`<span class="badge b-alert">🚨 ${e.alertTags.length} alerts</span>`:'<span class="badge b-ok">✅ Normal</span>'}
+        ${totalAlerts?`<span class="badge b-alert">🚨 ${totalAlerts}</span>`:'<span class="badge b-ok">✅ Normal</span>'}
       </div>
-      ${e.remarks?`<div class="mini" style="margin-bottom:8px;padding:6px;background:#f8f9ff;border-radius:6px">📝 Remarks: ${e.remarks}</div>`:''}
-      ${alertSummary}
-      <details>
-        <summary style="font-size:11px;font-weight:700;color:var(--blue);cursor:pointer;padding:4px 0">📋 View all ${Object.keys(e.readings||{}).length} readings</summary>
-        <div style="margin-top:8px">${sectionHtml}</div>
-      </details>
-      ${reviewFilter==="pending" ? `
-      <div style="display:flex;gap:8px;margin-top:10px">
-        <button class="btn btn-green" style="margin-bottom:0;flex:1" onclick="reviewEntry(${e.id},'approve')">✅ Approve</button>
-        <button class="btn btn-red" style="margin-bottom:0;flex:1" onclick="reviewEntry(${e.id},'reject')">❌ Reject</button>
-      </div>` : reviewFilter==="approved" ? `
-      <div style="background:#f0fff4;border:1px solid var(--ok);border-radius:8px;padding:8px;margin-top:8px;font-size:11px;color:var(--ok)">
-        ✅ Approved by <strong>${e.reviewedBy||'Incharge'}</strong> on ${e.reviewedAt?new Date(e.reviewedAt).toLocaleString():''}
-      </div>` : `
-      <div style="background:#fff5f5;border:1px solid var(--alert);border-radius:8px;padding:8px;margin-top:8px;font-size:11px;color:var(--alert)">
-        ❌ Rejected by <strong>${e.reviewedBy||'Incharge'}</strong> — Reason: ${e.rejectComment||'No reason given'}
-      </div>`}
+      <div style="margin-top:8px">${hourRows}</div>
+      ${footer}
     </div>`;
   }).join('');
 }
-function reviewEntry(id, action){
+
+// Approve entire shift — with confirm + optional edit
+let _pendingShift = null;
+function approveShift(gid, date, shift){
+  _pendingShift = {gid, date, shift};
+  // Collect any edits the incharge made in the input fields
+  const edits = {};
+  document.querySelectorAll(`#shift_${gid} .edit_val`).forEach(inp=>{
+    const eid=inp.dataset.eid, tid=inp.dataset.tid, val=inp.value.trim();
+    (edits[eid]=edits[eid]||{})[tid]=val;
+  });
+  const remarks = {};
+  document.querySelectorAll(`#shift_${gid} .edit_remark`).forEach(inp=>{
+    remarks[inp.dataset.eid]=inp.value.trim();
+  });
+  _pendingShift.edits = edits;
+  _pendingShift.remarks = remarks;
+
+  // Detect if any edit differs from stored value
+  let anyEdit=false;
+  const shiftEntries = entries.filter(e=>e.date===date && e.shift===shift && e.status==="Pending Review");
+  shiftEntries.forEach(e=>{
+    Object.entries(edits[e.id]||{}).forEach(([tid,val])=>{
+      if(String(e.readings[tid]??"")!==String(val)) anyEdit=true;
+    });
+    if((remarks[e.id]||"")!==(e.remarks||"")) anyEdit=true;
+  });
+  _pendingShift.anyEdit = anyEdit;
+
+  // Show confirm dialog
+  document.getElementById("shiftapprove_title").textContent = `Approve ${shift} — ${date}?`;
+  document.getElementById("shiftapprove_msg").innerHTML = anyEdit
+    ? `You have <strong>edited some values</strong>. This will save your edits and approve the shift. It will be recorded as <strong>Approved &amp; Edited by you</strong>.`
+    : `This will approve all ${shiftEntries.length} entries of this shift. Do you want to approve?`;
+  document.getElementById("shiftapprove_name").value="";
+  showModal("shiftapprove_modal");
+}
+
+async function confirmShiftApprove(){
+  const name = document.getElementById("shiftapprove_name").value.trim();
+  if(!name){ toast("⚠️ Enter your name"); return; }
+  closeModal("shiftapprove_modal");
+  const {date, shift, edits, remarks, anyEdit} = _pendingShift;
+  const shiftEntries = entries.filter(e=>e.date===date && e.shift===shift && e.status==="Pending Review");
+  if(!shiftEntries.length){ toast("No pending entries in this shift"); return; }
+  const now = new Date().toISOString();
+
+  toast("⏳ Approving shift...");
+  let alertsInShift = 0;
+  for(const e of shiftEntries){
+    // apply edits
+    const upd = {status:'Reviewed', reviewed_by:name, reviewed_at:now};
+    let changed = false;
+    if(edits[e.id]){
+      Object.entries(edits[e.id]).forEach(([tid,val])=>{
+        const t=TAGS.find(x=>x.id===tid);
+        let newVal = val;
+        if(t && !(t.type==="text"||t.type==="select"||t.type==="motor")){ const n=parseFloat(val); newVal=isNaN(n)?val:n; }
+        if(String(e.readings[tid]??"")!==String(newVal)){ e.readings[tid]=newVal; changed=true; }
+      });
+    }
+    if(remarks[e.id]!==undefined && remarks[e.id]!==(e.remarks||"")){ e.remarks=remarks[e.id]; changed=true; }
+    // recompute alerts after edit
+    if(changed){
+      e.alertTags = TAGS.filter(t=>{ const v=e.readings[t.id]; if(v===undefined||v==="") return false; const st=tagStatus(t,parseFloat(v)); return st==='high'||st==='low'; }).map(t=>t.id);
+      upd.readings = e.readings;
+      upd.alert_tags = e.alertTags;
+      upd.remarks = e.remarks;
+      e.editedBy = name;
+      upd.edited_by = name;
+    }
+    e.status="Reviewed"; e.reviewedBy=name; e.reviewedAt=now;
+    alertsInShift += (e.alertTags?.length||0);
+    const {error} = await sb.from('hourly_entries').eq('id',e.id).update(upd);
+    if(error){ showCloudError("Save error: "+error.message); }
+  }
+  await sb.from('audit_log').insert({actor:name,action:anyEdit?'Shift approved & edited':'Shift approved',detail:`${shift} ${date} — ${shiftEntries.length} entries by ${name}`}).catch(()=>{});
+  log_audit(name, anyEdit?"Shift approved & edited":"Shift approved", `${shift} ${date}`);
+
+  // Notify HoD + Control Room
+  const subj = `✅ Shift Approved — ${shift} ${date} — CCP Urea Plant`;
+  const body = `${shift} on ${date} approved${anyEdit?" (with edits)":""} by ${name}. ${shiftEntries.length} entries, ${alertsInShift} alert(s).`;
+  notify(settings.recipients.hod, subj, body);
+  if(settings.recipients.incharge) notify(settings.recipients.incharge, subj, body);
+
+  toast(`✅ ${shift} approved${anyEdit?" & edits saved":""} — HoD notified`);
+  await loadFromSupabase();
+  renderPendingReviews();
+}
+
+function _oldReviewEntry(id, action){
   _pendingReviewId = id;
   if(action==="approve"){
     document.getElementById("approve_name_inp").value="";
@@ -11760,8 +11887,28 @@ function computeStatValues(){
     const toStr = document.getElementById("statavg_to").value || fromStr;
     const rangeEntries = visibleEntries().filter(e=>e.date>=fromStr && e.date<=toStr);
     TAGS.forEach(t=>{
-      if(t.type==="text"||t.type==="select"||t.type==="motor"){
-        // Non-numeric — show most recent value in range, not average
+      if(t.type==="leak"){
+        // Leakage — compute days-affected breakdown by severity
+        const byDay = {}; // date -> worst severity that day
+        rangeEntries.forEach(e=>{
+          const v=e.readings[t.id];
+          if(v===undefined||v==="") return;
+          const sev = LEAK_SEVERITY[v] ?? 0;
+          if(byDay[e.date]===undefined || sev>byDay[e.date]) byDay[e.date]={sev, val:v};
+          else if(byDay[e.date].sev<sev) byDay[e.date]={sev, val:v};
+        });
+        const days = Object.values(byDay);
+        const totalDays = days.length;
+        if(totalDays){
+          // Count days at each severity level (by worst-of-day)
+          const counts = {Nil:0, DD:0, Slight:0, Heavy:0};
+          Object.values(byDay).forEach(d=>{ counts[d.val] = (counts[d.val]||0)+1; });
+          // Worst severity present
+          const worst = Object.values(byDay).reduce((m,d)=>Math.max(m,d.sev),0);
+          vals[t.id] = {isLeak:true, counts, totalDays, worst};
+          meta[t.id] = totalDays+" days";
+        }
+      } else if(t.type==="text"||t.type==="select"||t.type==="motor"){
         const recent = rangeEntries.filter(e=>e.readings[t.id]!==undefined && e.readings[t.id]!=="");
         if(recent.length){ vals[t.id]=recent[0].readings[t.id]; meta[t.id]="latest in range"; }
       } else {
@@ -12118,7 +12265,40 @@ function renderStatCards(){
   statDialInstances.forEach(c=>c.destroy()); statDialInstances=[];
   wrap.innerHTML = `<div class="stat-grid">`+secTags.map((t,i)=>{
     const v=latest[t.id]; 
-    const isNonNumeric = t.type==="text" || t.type==="select" || t.type==="motor";
+    const isNonNumeric = t.type==="text" || t.type==="select" || t.type==="motor" || t.type==="leak";
+
+    // Leakage summary card (days affected)
+    if(t.type==="leak"){
+      if(v && v.isLeak){
+        const {counts, totalDays, worst} = v;
+        const worstColor = worst>=3?"#c62828":worst===2?"#e65100":worst===1?"#f9a825":"#00695c";
+        const worstBg = worst>=3?"#ffebee":worst===2?"#fff3e0":worst===1?"#fffde7":"#e8f5e9";
+        const icon = worst>=3?"🔴":worst===2?"🟠":worst===1?"🟡":"✅";
+        // Build breakdown text (only show non-zero)
+        const parts=[];
+        ["Heavy","Slight","DD","Nil"].forEach(lv=>{ if(counts[lv]) parts.push(`${lv}: ${counts[lv]}`); });
+        const summary = worst===0 ? `Nil — clear all ${totalDays} days` : parts.join(" · ")+` (of ${totalDays} days)`;
+        return `<div class="stat-card" style="display:flex;flex-direction:column;justify-content:center;min-height:120px">
+          <div class="stat-name">${t.name}</div>
+          <div style="text-align:center;margin:10px 0">
+            <span style="display:inline-block;background:${worstBg};color:${worstColor};font-size:12px;font-weight:800;padding:8px 14px;border-radius:14px;border:2px solid ${worstColor};line-height:1.4">${icon} ${summary}</span>
+          </div>
+        </div>`;
+      } else {
+        // latest mode — single value
+        const displayVal = (v!=null && v!=="") ? v : "—";
+        const sev = LEAK_SEVERITY[displayVal] ?? 0;
+        const c = sev>=3?"#c62828":sev===2?"#e65100":sev===1?"#f9a825":"#00695c";
+        const bg = sev>=3?"#ffebee":sev===2?"#fff3e0":sev===1?"#fffde7":"#e8f5e9";
+        return `<div class="stat-card" style="display:flex;flex-direction:column;justify-content:center;min-height:120px">
+          <div class="stat-name">${t.name}</div>
+          <div style="text-align:center;margin:12px 0">
+            <span style="display:inline-block;background:${bg};color:${c};font-size:14px;font-weight:800;padding:8px 16px;border-radius:20px;border:2px solid ${c}">💧 ${displayVal}</span>
+          </div>
+        </div>`;
+      }
+    }
+
     const st=(!isNonNumeric && v!=null && !isNaN(parseFloat(v)))?tagStatus(t,parseFloat(v)):null;
     const pillClass = st==="high"?"pill-high":st==="low"?"pill-low":"pill-ok";
     const pillText = st==="high"?"HIGH":st==="low"?"LOW":"OK";
@@ -12380,6 +12560,14 @@ function renderTrendChart(){
 
   let labels, datasets;
 
+  // Convert a reading to a plottable number (handles leak severity: Nil=0,DD=1,Slight=2,Heavy=3)
+  const toNum = (tid, raw) => {
+    const t = TAGS.find(x=>x.id===tid);
+    if(t && t.type==="leak"){ return LEAK_SEVERITY[raw] ?? null; }
+    const n = parseFloat(raw);
+    return isNaN(n) ? null : n;
+  };
+
   if(trendMode==="avg"){
     // Daily average mode — one point per day
     const days=[];
@@ -12387,14 +12575,17 @@ function renderTrendChart(){
     labels = days;
     datasets = selectedTrendTags.map((tid,i)=>{
       const t=TAGS.find(x=>x.id===tid);
+      const isLeak = t && t.type==="leak";
       const data=days.map(date=>{
         const dayE=rangeEntries.filter(e=>e.date===date&&e.readings[tid]!==undefined&&e.readings[tid]!=="");
         if(!dayE.length) return null;
-        const nums=dayE.map(e=>parseFloat(e.readings[tid])).filter(n=>!isNaN(n));
+        const nums=dayE.map(e=>toNum(tid,e.readings[tid])).filter(n=>n!==null);
         if(!nums.length) return null;
+        // For leakage: show the WORST (max) severity of the day, not average
+        if(isLeak) return Math.max(...nums);
         return +(nums.reduce((a,n)=>a+n,0)/nums.length).toFixed(2);
       });
-      return {label:t.name+" (avg)",data,borderColor:colors[i%colors.length],backgroundColor:colors[i%colors.length]+"22",fill:true,tension:.35,spanGaps:true,pointRadius:3,pointHoverRadius:6,borderWidth:2.5,showLine:true};
+      return {label:t.name+(isLeak?" (severity)":" (avg)"),data,borderColor:colors[i%colors.length],backgroundColor:colors[i%colors.length]+"22",fill:true,tension:.35,spanGaps:true,pointRadius:3,pointHoverRadius:6,borderWidth:2.5,showLine:true};
     });
   } else {
     // Raw hourly mode — one point per entry, SORTED chronologically
@@ -12406,19 +12597,21 @@ function renderTrendChart(){
     });
     datasets = selectedTrendTags.map((tid,i)=>{
       const t=TAGS.find(x=>x.id===tid);
+      const isLeak = t && t.type==="leak";
       const data=labels.map(lbl=>{
         const match=rangeEntries.find(e=>(e.date+" "+e.hour)===lbl && e.readings[tid]!==undefined && e.readings[tid]!=="");
         if(!match) return null;
-        const num = parseFloat(match.readings[tid]);
-        return isNaN(num) ? null : num;
+        return toNum(tid, match.readings[tid]);
       });
-      return {label:t.name,data,borderColor:colors[i%colors.length],backgroundColor:"transparent",fill:false,tension:.3,spanGaps:true,pointRadius:dayCount>15?0:dayCount>7?1.5:2.5,pointHoverRadius:5,borderWidth:3,showLine:true};
+      return {label:t.name+(isLeak?" (severity)":""),data,borderColor:colors[i%colors.length],backgroundColor:"transparent",fill:false,tension:.3,spanGaps:true,pointRadius:dayCount>15?0:dayCount>7?1.5:2.5,pointHoverRadius:5,borderWidth:3,showLine:true};
     });
   }
   const pxPerPoint = trendMode==="avg" ? (dayCount<=7?60:dayCount<=15?40:25) : (dayCount<=1?60:dayCount<=7?18:8);
   const wrapEl=document.getElementById("trend_scroll_wrap"); const minW=wrapEl.clientWidth||300;
   const neededW=Math.max(minW, labels.length*pxPerPoint);
   document.getElementById("trend_canvas_holder").style.width=neededW+"px";
+  const anyLeakSelected = selectedTrendTags.some(tid=>{ const t=TAGS.find(x=>x.id===tid); return t && t.type==="leak"; });
+  const leakLabels = {0:"Nil",1:"DD",2:"Slight",3:"Heavy"};
   if(trendChartInstance) trendChartInstance.destroy();
   const canvas=document.getElementById("trend_chart"); canvas.width=neededW;
   trendChartInstance=new Chart(canvas.getContext("2d"),{type:"line",data:{labels,datasets},
@@ -12430,12 +12623,20 @@ function renderTrendChart(){
           mode:'index',
           intersect:false,
           callbacks:{
-            label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y}`
+            label: ctx => {
+              const tid = selectedTrendTags[ctx.datasetIndex];
+              const t = TAGS.find(x=>x.id===tid);
+              if(t && t.type==="leak"){ return `${ctx.dataset.label}: ${leakLabels[ctx.parsed.y]??ctx.parsed.y}`; }
+              return `${ctx.dataset.label}: ${ctx.parsed.y}`;
+            }
           }
         },
         datalabels: false,
       },
-      scales:{x:{ticks:{maxRotation:70,minRotation:70,font:{size:8},autoSkip:true,maxTicksLimit:30}}},
+      scales:{
+        x:{ticks:{maxRotation:70,minRotation:70,font:{size:8},autoSkip:true,maxTicksLimit:30}},
+        ...(anyLeakSelected ? {y:{min:0,max:3,ticks:{stepSize:1,font:{size:9},callback:v=>leakLabels[v]??v}}} : {})
+      },
       events:['mousemove','mouseout','click'],
     }});
   canvas.style.touchAction = 'pan-x';
@@ -12770,14 +12971,29 @@ function processImportData(data, statusEl){
     if(!HOURS.includes(hour)){ skipped++; skipReasons.push(`Row ${i+2}: invalid hour "${row["Hour"]}"`); return; }
     if(!operator){ skipped++; skipReasons.push(`Row ${i+2}: missing operator name`); return; }
     const readings={};
+    // Build a normalized lookup of the row's columns for flexible matching
+    const normalize = s => String(s||"").toLowerCase().replace(/[^a-z0-9]/g,"");
+    const rowNorm = {};
+    Object.keys(row).forEach(k=>{ rowNorm[normalize(k)] = row[k]; });
     TAGS.forEach(t=>{
-      const raw = row[t.name];
+      // Try exact name first, then normalized match
+      let raw = row[t.name];
+      if(raw===undefined || raw===null || String(raw).trim()===""){
+        raw = rowNorm[normalize(t.name)];
+      }
       if(raw!==undefined && raw!==null && String(raw).trim()!==""){
-        const v=parseFloat(raw);
-        if(!isNaN(v)) readings[t.id]=v;
+        const str = String(raw).trim();
+        if(t.type==="text" || t.type==="select" || t.type==="motor" || t.type==="leak"){
+          // Text/select/motor/leak — store as-is (Nil, DD, Slight, Heavy, Motor No.2, Spare, etc.)
+          readings[t.id]=str;
+        } else {
+          // Number — parse; if not a number, still store the raw text (don't lose data)
+          const v=parseFloat(str);
+          readings[t.id]= isNaN(v) ? str : v;
+        }
       }
     });
-    if(!Object.keys(readings).length){ skipped++; skipReasons.push(`Row ${i+2}: no readable tag values`); return; }
+    if(!Object.keys(readings).length){ skipped++; skipReasons.push(`Row ${i+2}: no readable tag values (check column headers match template)`); return; }
     const shift = shiftForHour(hour);
     const alertTags = TAGS.filter(t=>readings[t.id]!==undefined && (tagStatus(t,readings[t.id])==="high"||tagStatus(t,readings[t.id])==="low")).map(t=>t.id);
     const existingIdx = entries.findIndex(e=>e.date===date && e.hour===hour && e.operator===operator);
