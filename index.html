@@ -10538,6 +10538,33 @@ canvas.sigpad{width:100%;height:120px;border:1.5px solid var(--border);border-ra
   </div>
 
   <div class="card">
+    <div class="ct">🔍 Cause Analysis (correlation)</div>
+    <p class="mini" style="margin-bottom:8px">Find which parameters move together with a target (e.g. seal leakage). Auto scans all parameters, or pick specific ones.</p>
+    <div class="row2" style="margin-bottom:8px">
+      <div><label class="lbl">Target parameter</label><select id="cause_target"></select></div>
+      <div><label class="lbl">Date range</label>
+        <select id="cause_range" onchange="runCauseAnalysis()">
+          <option value="7">Last 7 days</option>
+          <option value="15">Last 15 days</option>
+          <option value="30" selected>Last 30 days</option>
+          <option value="90">Last 90 days</option>
+          <option value="9999">All data</option>
+        </select>
+      </div>
+    </div>
+    <div style="display:flex;gap:6px;margin-bottom:8px">
+      <button class="btn btn-navy" style="margin-bottom:0;flex:1" onclick="runCauseAnalysis('auto')">🔍 Auto-Analyze (all params)</button>
+      <button class="btn btn-outline" style="margin-bottom:0;flex:1" onclick="toggleCausePick()">📋 Pick params</button>
+    </div>
+    <div id="cause_pick_panel" style="display:none;background:#f8f9ff;border-radius:8px;padding:8px;margin-bottom:8px">
+      <div class="mini" style="margin-bottom:6px">Select parameters to compare against the target:</div>
+      <div id="cause_pick_chips" style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px"></div>
+      <button class="btn btn-blue" style="margin-bottom:0" onclick="runCauseAnalysis('manual')">Correlate selected</button>
+    </div>
+    <div id="cause_results"></div>
+  </div>
+
+  <div class="card">
     <div class="ct">🔗 Correlation View</div>
     <div class="row2" style="margin-bottom:8px">
       <div><label class="lbl">Tag X</label><select id="corr_x_select" onchange="renderCorrelationChart()"></select></div>
@@ -10779,9 +10806,9 @@ const TAGS = [
   {id:"SFCF_1", section:"CCP_FIELD", name:"Seal Flush Cond. Filter No.1 Out", unit:"Kg/cm²g", min:5, max:8},
   {id:"SFCF_2", section:"CCP_FIELD", name:"Seal Flush Cond. Filter No.2 Out", unit:"Kg/cm²g", min:5, max:8},
   {id:"SFCF_DIFF", section:"CCP_FIELD", name:"Seal Flush Cond. Filter Diff", unit:"Kg/cm²", min:null, max:1.0},
-  {id:"LEAK_BOOSTER", section:"CCP_FIELD", name:"Seal Leakage — Booster Pump", unit:"", type:"leak", min:null, max:null},
-  {id:"LEAK_MAIN_LP", section:"CCP_FIELD", name:"Seal Leakage — Main Pump (LP Side)", unit:"", type:"leak", min:null, max:null},
-  {id:"LEAK_MAIN_HP", section:"CCP_FIELD", name:"Seal Leakage — Main Pump (HP Side)", unit:"", type:"leak", min:null, max:null},
+  {id:"LEAK_BOOSTER", section:"CCP_FIELD", name:"Seal Leakage — Booster Pump", unit:"", type:"text", min:null, max:null},
+  {id:"LEAK_MAIN_LP", section:"CCP_FIELD", name:"Seal Leakage — Main Pump (LP Side)", unit:"", type:"text", min:null, max:null},
+  {id:"LEAK_MAIN_HP", section:"CCP_FIELD", name:"Seal Leakage — Main Pump (HP Side)", unit:"", type:"text", min:null, max:null},
 ];
 
 const HOURS = ["0700","0800","0900","1000","1100","1200","1300","1400","1500","1600","1700","1800","1900","2000","2100","2200","2300","0000","0100","0200","0300","0400","0500","0600"];
@@ -12674,6 +12701,277 @@ function initCorrSelects(){
 function setCorrPreset(days){ const to=new Date(); const from=new Date(); from.setDate(from.getDate()-(days-1));
   document.getElementById("corr_from").value=toDateStr(from); document.getElementById("corr_to").value=toDateStr(to); renderCorrelationChart(); }
 function onCorrRangeChange(){ const f=document.getElementById("corr_from").value,t=document.getElementById("corr_to").value; if(!f||!t)return; if(f>t){toast("⚠️ 'From' must be before 'To'");return;} renderCorrelationChart(); }
+// ══ ONSET DETECTION — find when a parameter started rising ══
+function detectOnset(tagId, days){
+  const to=new Date(), from=new Date(); from.setDate(from.getDate()-days);
+  const rangeE=entries.filter(e=>{const d=new Date(e.date);return d>=from&&d<=to;})
+    .filter(e=>readingToNumber(e.readings[tagId])!==null)
+    .sort((a,b)=>(a.date+a.hour).localeCompare(b.date+b.hour));
+  if(rangeE.length<6) return null;
+  // Daily worst/average value
+  const byDay={};
+  rangeE.forEach(e=>{ const v=readingToNumber(e.readings[tagId]); if(byDay[e.date]===undefined||v>byDay[e.date]) byDay[e.date]=v; });
+  const dates=Object.keys(byDay).sort();
+  const vals=dates.map(d=>byDay[d]);
+  if(vals.length<4) return null;
+  // baseline = min of first 30% of period
+  const baseCount=Math.max(2,Math.floor(vals.length*0.3));
+  const baseline=Math.min(...vals.slice(0,baseCount));
+  const peak=Math.max(...vals);
+  if(peak<=baseline*1.3 && peak-baseline<2) return {rising:false, baseline, peak}; // basically flat
+  // find first day it clearly exceeds baseline (by 30% or +2 units)
+  let onsetDate=null, onsetVal=null;
+  for(let i=baseCount;i<vals.length;i++){
+    if(vals[i]>baseline*1.3 && vals[i]-baseline>=1){ onsetDate=dates[i]; onsetVal=vals[i]; break; }
+  }
+  return {rising:!!onsetDate, baseline, peak, onsetDate, onsetVal, firstDate:dates[0], lastDate:dates[dates.length-1], lastVal:vals[vals.length-1]};
+}
+
+function onsetHtml(tagId, days){
+  const t=TAGS.find(x=>x.id===tagId);
+  const o=detectOnset(tagId, days);
+  if(!o) return '';
+  if(!o.rising){
+    return `<div style="background:#f0fff4;border:1px solid var(--ok);border-radius:8px;padding:8px;margin-top:8px;font-size:11px;color:var(--ok)">📈 ${t.name} has been stable in this period (no clear rising trend).</div>`;
+  }
+  return `<div style="background:#fff8e1;border:1px solid #f9a825;border-radius:8px;padding:10px;margin-top:8px;font-size:11px;line-height:1.5">
+    📈 <strong>Onset detected for ${t.name}:</strong><br>
+    • Baseline was ~${o.baseline} until ${fmtD(o.onsetDate)}<br>
+    • Started rising on <strong>${fmtD(o.onsetDate)}</strong> (reached ${o.onsetVal})<br>
+    • Now at ${o.lastVal} (as of ${fmtD(o.lastDate)})<br>
+    🔍 <span style="color:var(--muted)">What changed around ${fmtD(o.onsetDate)}? Check maintenance, load, filter age, or feed quality on/near that date.</span>
+  </div>`;
+}
+function fmtD(d){ if(!d) return '—'; const p=d.split('-'); return p.length===3?`${p[2]}-${p[1]}-${p[0]}`:d; }
+
+// ══ CHAT BOX — free built-in Q&A over the data ══
+function askPlant(){
+  const q=(document.getElementById("chat_input").value||"").toLowerCase().trim();
+  const out=document.getElementById("chat_answer");
+  if(!q){ out.innerHTML=""; return; }
+
+  // Helper: find a tag mentioned in the question
+  const findTag=()=>{
+    // match by keywords
+    const kw=[
+      ["lp","LEAK_MAIN_LP"],["hp","LEAK_MAIN_HP"],["booster leak","LEAK_BOOSTER"],
+      ["leakage","LEAK_MAIN_LP"],["leak","LEAK_MAIN_LP"],
+      ["discharge pressure","MP_DISCHARGE"],["pi-8","MP_PI8"],["pi8","MP_PI8"],["pi-9","DISCHARGE_PRESS"],
+      ["discharge temp","DISCHARGE_TEMP"],["oil temp","OIL_IN"],["flow","MP_FLOW"],
+      ["main pump motor","MP_MOTOR"],["booster motor","BP_MOTOR"],["motor","MP_MOTOR"],
+      ["filter diff","SFCF_DIFF"],["gear","GEARBOX_TEMP"]
+    ];
+    for(const [k,id] of kw){ if(q.includes(k) && TAGS.find(t=>t.id===id)) return TAGS.find(t=>t.id===id); }
+    // try matching tag names
+    for(const t of TAGS){ if(q.includes(t.name.toLowerCase().split(" ")[0]) && t.name.length>4) return t; }
+    return null;
+  };
+  // Parse day range from question
+  let days=7; const dm=q.match(/(\d+)\s*day/); if(dm) days=parseInt(dm[1]);
+  if(q.includes("month")) days=30; if(q.includes("week")) days=7; if(q.includes("today")) days=1;
+
+  let answer="";
+
+  // 1. ONSET / when did it start
+  if(q.includes("when") || q.includes("start") || q.includes("onset") || q.includes("begin")){
+    const t=findTag();
+    if(t){ const html=onsetHtml(t.id, Math.max(days,30)); answer = html || `Not enough data on ${t.name} to detect onset.`; }
+    else answer="Which parameter? Try: 'When did LP leakage start rising?'";
+  }
+  // 2. ALERTS
+  else if(q.includes("alert") || q.includes("alarm") || q.includes("out of range")){
+    const to=new Date(),from=new Date();from.setDate(from.getDate()-days);
+    const rE=entries.filter(e=>{const d=new Date(e.date);return d>=from&&d<=to;});
+    const counts={}; rE.forEach(e=>(e.alertTags||[]).forEach(tid=>counts[tid]=(counts[tid]||0)+1));
+    const total=Object.values(counts).reduce((a,b)=>a+b,0);
+    if(!total){ answer=`✅ No alerts in the last ${days} days.`; }
+    else{
+      const ranked=Object.entries(counts).sort((a,b)=>b[1]-a[1]).slice(0,6)
+        .map(([tid,c])=>{const t=TAGS.find(x=>x.id===tid);return `• ${t?t.name:tid}: ${c}×`;}).join("<br>");
+      answer=`🚨 <strong>${total} alert(s)</strong> in the last ${days} days:<br>${ranked}`;
+    }
+  }
+  // 3. AVERAGE / value
+  else if(q.includes("average")||q.includes("avg")||q.includes("mean")||q.includes("value")){
+    const t=findTag();
+    if(t){
+      const to=new Date(),from=new Date();from.setDate(from.getDate()-days);
+      const nums=entries.filter(e=>{const d=new Date(e.date);return d>=from&&d<=to;})
+        .map(e=>readingToNumber(e.readings[t.id])).filter(v=>v!==null);
+      if(nums.length){
+        const avg=(nums.reduce((a,b)=>a+b,0)/nums.length).toFixed(1);
+        const mn=Math.min(...nums), mx=Math.max(...nums);
+        answer=`📊 <strong>${t.name}</strong> (last ${days} days, ${nums.length} readings):<br>• Average: ${avg} ${t.unit}<br>• Min: ${mn} · Max: ${mx}`;
+      } else answer=`No readings for ${t.name} in the last ${days} days.`;
+    } else answer="Which parameter? e.g. 'Average discharge pressure last 7 days'";
+  }
+  // 4. WORST SHIFT
+  else if(q.includes("shift") && (q.includes("worst")||q.includes("most")||q.includes("alert"))){
+    const to=new Date(),from=new Date();from.setDate(from.getDate()-days);
+    const rE=entries.filter(e=>{const d=new Date(e.date);return d>=from&&d<=to;});
+    const byShift={"A Shift":0,"B Shift":0,"C Shift":0};
+    rE.forEach(e=>{ byShift[e.shift]=(byShift[e.shift]||0)+(e.alertTags?.length||0); });
+    const ranked=Object.entries(byShift).sort((a,b)=>b[1]-a[1]);
+    answer=`⏰ Alerts by shift (last ${days} days):<br>${ranked.map(([s,c])=>`• ${s}: ${c} alerts`).join("<br>")}<br><strong>${ranked[0][0]}</strong> has the most.`;
+  }
+  // 5. TREND / how is it doing
+  else if(q.includes("trend")||q.includes("how is")||q.includes("doing")||q.includes("increasing")||q.includes("rising")){
+    const t=findTag();
+    if(t){
+      const html=onsetHtml(t.id, Math.max(days,30));
+      const to=new Date(),from=new Date();from.setDate(from.getDate()-Math.max(days,30));
+      const nums=entries.filter(e=>{const d=new Date(e.date);return d>=from&&d<=to;})
+        .map(e=>readingToNumber(e.readings[t.id])).filter(v=>v!==null);
+      const recent=nums.slice(-5), early=nums.slice(0,5);
+      const trend = recent.length&&early.length ? (recent.reduce((a,b)=>a+b,0)/recent.length) - (early.reduce((a,b)=>a+b,0)/early.length) : 0;
+      const dir = trend>0.5?"increasing 📈":trend<-0.5?"decreasing 📉":"stable ➡️";
+      answer=`📊 <strong>${t.name}</strong> is ${dir} over the period.${html?"<br>"+html:""}`;
+    } else answer="Which parameter? e.g. 'How is LP leakage trending?'";
+  }
+  // 6. COMPLIANCE / entries
+  else if(q.includes("compliance")||q.includes("logged")||q.includes("entries")||q.includes("missing")){
+    const to=new Date(),from=new Date();from.setDate(from.getDate()-days);
+    const rE=entries.filter(e=>{const d=new Date(e.date);return d>=from&&d<=to;});
+    const daysCount=new Set(rE.map(e=>e.date)).size;
+    answer=`📋 ${rE.length} entries logged over ${daysCount} days (last ${days} days). Expected ~${daysCount*24}. Compliance: ${daysCount?Math.round(rE.length/(daysCount*24)*100):0}%.`;
+  }
+  else{
+    answer=`I can answer questions like:<br>• "When did LP leakage start rising?"<br>• "Show alerts this week"<br>• "Average discharge pressure last 7 days"<br>• "Which shift has most alerts?"<br>• "How is HP leakage trending?"<br>• "Compliance this month"`;
+  }
+
+  out.innerHTML=`<div style="background:#f8f9ff;border:1px solid var(--border);border-radius:10px;padding:12px;margin-top:6px;font-size:12px;line-height:1.6;color:var(--text)">${answer}</div>`;
+}
+
+// ══ CAUSE ANALYSIS (correlation) ══
+// Extract a plottable number from any reading (handles "DD"->0.5, "5 mL"->5, "Nil"->0)
+function readingToNumber(raw){
+  if(raw===undefined||raw===null||raw==="") return null;
+  const s=String(raw).trim().toLowerCase();
+  if(s==="nil"||s==="-"||s==="0") return 0;
+  if(s==="dd"||s==="d/d") return 0.5; // drop-by-drop = tiny leak
+  if(s==="slight") return 2;
+  if(s==="heavy") return 5;
+  // Extract first number from strings like "5 mL", "12ml", "20"
+  const m = s.match(/-?\d+\.?\d*/);
+  return m ? parseFloat(m[0]) : null;
+}
+
+function pearson(xs, ys){
+  const n=xs.length;
+  if(n<3) return null;
+  const mx=xs.reduce((a,b)=>a+b,0)/n, my=ys.reduce((a,b)=>a+b,0)/n;
+  let num=0, dx=0, dy=0;
+  for(let i=0;i<n;i++){ const a=xs[i]-mx, b=ys[i]-my; num+=a*b; dx+=a*a; dy+=b*b; }
+  if(dx===0||dy===0) return null; // no variation
+  return num/Math.sqrt(dx*dy);
+}
+
+function initCauseAnalysis(){
+  const sel=document.getElementById("cause_target");
+  if(sel && !sel.options.length){
+    TAGS.forEach(t=>sel.add(new Option(t.name, t.id)));
+    // default to LP leakage
+    const lp=TAGS.find(t=>t.id==="LEAK_MAIN_LP"); if(lp) sel.value="LEAK_MAIN_LP";
+  }
+  const chips=document.getElementById("cause_pick_chips");
+  if(chips && !chips.children.length){
+    TAGS.forEach(t=>{
+      const c=document.createElement("span"); c.className="chip"; c.style.opacity=0.4; c.dataset.tid=t.id;
+      c.textContent=t.name;
+      c.onclick=()=>{ const on=c.style.opacity==="1"; c.style.opacity=on?0.4:1; c.textContent=(on?"":"✓ ")+t.name; };
+      chips.appendChild(c);
+    });
+  }
+}
+
+function toggleCausePick(){
+  const p=document.getElementById("cause_pick_panel");
+  p.style.display = p.style.display==="none" ? "block" : "none";
+}
+
+function runCauseAnalysis(mode){
+  const targetId = document.getElementById("cause_target").value;
+  const target = TAGS.find(t=>t.id===targetId);
+  const days = parseInt(document.getElementById("cause_range").value);
+  const out = document.getElementById("cause_results");
+
+  // date range
+  const to = new Date();
+  const from = new Date(); from.setDate(from.getDate()-days);
+  const inRange = e => { const d=new Date(e.date); return d>=from && d<=to; };
+  const rangeE = entries.filter(inRange);
+
+  // Which parameters to compare against
+  let compareIds;
+  if(mode==="manual"){
+    compareIds = [...document.querySelectorAll("#cause_pick_chips .chip")].filter(c=>c.style.opacity==="1").map(c=>c.dataset.tid).filter(id=>id!==targetId);
+    if(!compareIds.length){ out.innerHTML=`<div class="mini" style="color:var(--alert)">⚠️ Pick at least one parameter to compare.</div>`; return; }
+  } else {
+    // auto — all numeric-ish params except target
+    compareIds = TAGS.filter(t=>t.id!==targetId).map(t=>t.id);
+  }
+
+  // Build paired series (only entries where BOTH target and compare have values)
+  const results = [];
+  compareIds.forEach(cid=>{
+    const xs=[], ys=[];
+    rangeE.forEach(e=>{
+      const tv=readingToNumber(e.readings[targetId]);
+      const cv=readingToNumber(e.readings[cid]);
+      if(tv!==null && cv!==null){ ys.push(tv); xs.push(cv); }
+    });
+    const r = pearson(xs, ys);
+    if(r!==null){ results.push({cid, r, n:xs.length, name:TAGS.find(t=>t.id===cid)?.name||cid}); }
+  });
+
+  if(!results.length){
+    out.innerHTML=`<div class="mini" style="color:var(--alert)">⚠️ Not enough varying data to analyze. ${target.name} may be constant (e.g. all "Nil"/"DD") in this period, or too few paired readings. Try a wider range or wait for more data.</div>`;
+    return;
+  }
+
+  // Sort by absolute correlation strength
+  results.sort((a,b)=>Math.abs(b.r)-Math.abs(a.r));
+
+  const strengthLabel = r => { const a=Math.abs(r); return a>=0.7?"Strong":a>=0.4?"Moderate":a>=0.2?"Weak":"Negligible"; };
+  const strengthColor = r => { const a=Math.abs(r); return a>=0.7?"#c62828":a>=0.4?"#e65100":a>=0.2?"#f9a825":"#9e9e9e"; };
+  const dot = r => { const a=Math.abs(r); return a>=0.7?"🔴":a>=0.4?"🟠":a>=0.2?"🟡":"⚪"; };
+  const dir = r => r>0?"↑ rises together":"↓ inverse";
+
+  const top = results[0];
+  const rows = results.slice(0,10).map(res=>`
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #f0f0f0">
+      <span style="font-size:11px;color:var(--text)">${dot(res.r)} ${res.name}</span>
+      <span style="font-size:11px;font-weight:800;color:${strengthColor(res.r)}">r = ${res.r>=0?"+":""}${res.r.toFixed(2)} <span style="font-weight:400;color:var(--muted)">${strengthLabel(res.r)} ${dir(res.r)}</span></span>
+    </div>`).join("");
+
+  // Likely cause suggestion (top positive correlation)
+  const topPos = results.filter(r=>r.r>0)[0];
+  let suggestion = "";
+  if(topPos && Math.abs(topPos.r)>=0.4){
+    suggestion = `<div style="background:#fff8e1;border:1px solid #f9a825;border-radius:8px;padding:10px;margin-top:10px;font-size:11px;line-height:1.5">
+      💡 <strong>Likely related factor:</strong> ${topPos.name} (r = +${topPos.r.toFixed(2)}, ${strengthLabel(topPos.r).toLowerCase()})<br>
+      As ${topPos.name} increases, ${target.name} tends to increase too.<br>
+      <span style="color:var(--muted)">⚠️ Correlation suggests a relationship, not proof of cause. Confirm with physical inspection.</span>
+    </div>`;
+  } else {
+    suggestion = `<div class="mini" style="margin-top:8px;color:var(--muted)">No strong positive correlation found. The cause may be a factor not logged here (e.g. seal wear, vibration), or more data is needed.</div>`;
+  }
+
+  out.innerHTML = `
+    <div style="background:#fff;border:1px solid var(--border);border-radius:10px;padding:12px;margin-top:8px">
+      <div style="font-size:12px;font-weight:800;color:var(--navy);margin-bottom:2px">🔍 ${target.name} — Cause Analysis</div>
+      <div class="mini" style="margin-bottom:8px">${mode==="auto"?"Auto-scanned all parameters":"Selected parameters"} · ${results[0].n} paired readings · last ${days>9000?"all":days} days</div>
+      ${onsetHtml(targetId, Math.max(days>9000?90:days,30))}
+      <div style="font-size:11px;font-weight:700;color:var(--blue);margin:10px 0 4px">Correlated factors (ranked):</div>
+      ${rows}
+      ${suggestion}
+    </div>`;
+
+  // Also update the scatter chart to show target vs top match
+  const xsel=document.getElementById("corr_x_select"), ysel=document.getElementById("corr_y_select");
+  if(xsel && ysel && top){ xsel.value=top.cid; ysel.value=targetId; renderCorrelationChart(); }
+}
+
 function renderCorrelationChart(){
   initCorrSelects();
   if(!document.getElementById("corr_from").value){ setCorrPreset(15); return; }
@@ -12727,6 +13025,7 @@ function renderAnalysis(){
   renderTrendSelector();
   renderTrendChart();
   renderSummaryTable();
+  initCauseAnalysis();
   renderCorrelationChart();
   renderAlertSummary();
 }
