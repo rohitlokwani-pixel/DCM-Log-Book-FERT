@@ -10884,7 +10884,7 @@ async function loadFromSupabase(){
   try{
     const {data:eData,error:eErr}=await sb.from('hourly_entries').select('*').order('date',{ascending:false}).order('hour',{ascending:false});
     if(eErr) throw eErr;
-    entries=(eData||[]).map(r=>({id:r.id,date:r.date,hour:r.hour,shift:r.shift,operator:r.operator,readings:r.readings||{},alertTags:r.alert_tags||[],remarks:r.remarks||'',status:r.status||'Pending Review',reviewedBy:r.reviewed_by,reviewedAt:r.reviewed_at,editedBy:r.edited_by,rejectComment:r.reject_comment,imported:r.imported||false,qrScannedAt:r.qr_scanned_at,createdAt:r.created_at}));
+    entries=(eData||[]).map(r=>({id:r.id,date:r.date,hour:r.hour,shift:r.shift,operator:r.operator,readings:r.readings||{},alertTags:r.alert_tags||[],remarks:r.remarks||'',status:r.status||'Pending Review',reviewedBy:r.reviewed_by,reviewedAt:r.reviewed_at,editedBy:r.edited_by,editLog:r.edit_log||[],rejectComment:r.reject_comment,imported:r.imported||false,qrScannedAt:r.qr_scanned_at,createdAt:r.created_at}));
     const {data:aData}=await sb.from('audit_log').select('*').order('ts',{ascending:false}).limit(200);
     auditLog=(aData||[]).map(r=>({ts:r.ts,actor:r.actor,action:r.action,detail:r.detail||''}));
     const {data:sData}=await sb.from('settings').select('*');
@@ -11645,9 +11645,18 @@ function renderPendingReviews(){
     } else if(reviewFilter==="approved"){
       const first = shiftEntries[0];
       const editedNote = first.editedBy ? ` &amp; Edited` : '';
+      // Collect edit trail across the shift's entries
+      const editTrail = shiftEntries.filter(e=>e.editLog && e.editLog.length).map(e=>{
+        const changes = e.editLog.flatMap(log=>log.changes.map(c=>`${c.param}: ${c.old} → ${c.new}`));
+        return `<div style="font-size:10px;color:#5d4037;padding:2px 0"><strong>${e.hour.slice(0,2)}:${e.hour.slice(2)}</strong> — ${changes.join(", ")}</div>`;
+      }).join("");
       footer = `<div style="background:#f0fff4;border:1px solid var(--ok);border-radius:8px;padding:8px;margin-top:8px;font-size:11px;color:var(--ok)">
         ✅ Approved${editedNote} by <strong>${first.reviewedBy||'Shift Incharge'}</strong> ${first.reviewedAt?'on '+new Date(first.reviewedAt).toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}):''}
-      </div>`;
+      </div>
+      ${editTrail?`<div style="background:#fff8e1;border:1px solid #f9a825;border-radius:8px;padding:8px;margin-top:6px">
+        <div style="font-size:10px;font-weight:800;color:#e65100;margin-bottom:4px">✏️ EDIT TRAIL (by ${first.editedBy||first.reviewedBy})</div>
+        ${editTrail}
+      </div>`:''}`;
     } else {
       footer = `<div style="background:#fff5f5;border:1px solid var(--alert);border-radius:8px;padding:8px;margin-top:8px;font-size:11px;color:var(--alert)">
         ❌ Rejected by <strong>${shiftEntries[0].reviewedBy||'Shift Incharge'}</strong>
@@ -11719,19 +11728,28 @@ async function confirmShiftApprove(){
 
   toast("⏳ Approving shift...");
   let alertsInShift = 0;
+  const allEditLogs = []; // for audit summary
   for(const e of shiftEntries){
     // apply edits
     const upd = {status:'Reviewed', reviewed_by:name, reviewed_at:now};
     let changed = false;
+    const changeList = []; // {param, old, new}
     if(edits[e.id]){
       Object.entries(edits[e.id]).forEach(([tid,val])=>{
         const t=TAGS.find(x=>x.id===tid);
         let newVal = val;
         if(t && !(t.type==="text"||t.type==="select"||t.type==="motor")){ const n=parseFloat(val); newVal=isNaN(n)?val:n; }
-        if(String(e.readings[tid]??"")!==String(newVal)){ e.readings[tid]=newVal; changed=true; }
+        const oldVal = e.readings[tid];
+        if(String(oldVal??"")!==String(newVal)){
+          changeList.push({param: t?t.name:tid, old: (oldVal===undefined||oldVal==="")?"(blank)":oldVal, new: newVal});
+          e.readings[tid]=newVal; changed=true;
+        }
       });
     }
-    if(remarks[e.id]!==undefined && remarks[e.id]!==(e.remarks||"")){ e.remarks=remarks[e.id]; changed=true; }
+    if(remarks[e.id]!==undefined && remarks[e.id]!==(e.remarks||"")){
+      changeList.push({param:"Remark", old:e.remarks||"(blank)", new:remarks[e.id]||"(blank)"});
+      e.remarks=remarks[e.id]; changed=true;
+    }
     // recompute alerts after edit
     if(changed){
       e.alertTags = TAGS.filter(t=>{ const v=e.readings[t.id]; if(v===undefined||v==="") return false; const st=tagStatus(t,parseFloat(v)); return st==='high'||st==='low'; }).map(t=>t.id);
@@ -11740,13 +11758,21 @@ async function confirmShiftApprove(){
       upd.remarks = e.remarks;
       e.editedBy = name;
       upd.edited_by = name;
+      // build/append edit log entry
+      const editRecord = {by:name, at:now, changes:changeList};
+      e.editLog = (e.editLog||[]).concat([editRecord]);
+      upd.edit_log = e.editLog;
+      // add to audit summary
+      const changeStr = changeList.map(c=>`${c.param}: ${c.old}→${c.new}`).join("; ");
+      allEditLogs.push(`${e.hour}: ${changeStr}`);
+      await sb.from('audit_log').insert({actor:name,action:'Edited reading on approval',detail:`${date} ${shift} ${e.hour} — ${changeStr}`}).catch(()=>{});
     }
     e.status="Reviewed"; e.reviewedBy=name; e.reviewedAt=now;
     alertsInShift += (e.alertTags?.length||0);
     const {error} = await sb.from('hourly_entries').eq('id',e.id).update(upd);
     if(error){ showCloudError("Save error: "+error.message); }
   }
-  await sb.from('audit_log').insert({actor:name,action:anyEdit?'Shift approved & edited':'Shift approved',detail:`${shift} ${date} — ${shiftEntries.length} entries by ${name}`}).catch(()=>{});
+  await sb.from('audit_log').insert({actor:name,action:anyEdit?'Shift approved & edited':'Shift approved',detail:`${shift} ${date} — ${shiftEntries.length} entries by ${name}${allEditLogs.length?" · Edits: "+allEditLogs.join(" | "):""}`}).catch(()=>{});
   log_audit(name, anyEdit?"Shift approved & edited":"Shift approved", `${shift} ${date}`);
 
   // Notify HoD + Control Room
@@ -13059,12 +13085,13 @@ function downloadAllCSV(){
   });
 
   // Full header — all tags, every column
-  const hdrs = ["Date","Hour","Shift","Operator","Area",...TAGS.map(t=>t.name),"Status","Reviewed By","Submitted At","Out-of-range tags","Imported"];
+  const hdrs = ["Date","Hour","Shift","Operator","Area",...TAGS.map(t=>t.name),"Status","Reviewed By","Edited By","Edit Trail","Submitted At","Out-of-range tags","Imported"];
   const rows = data.map(e=>{
+    const editTrailStr = (e.editLog||[]).flatMap(log=>log.changes.map(c=>`${c.param}: ${c.old}→${c.new} [by ${log.by}]`)).join(" | ");
     const vals = [
       e.date, e.hour, e.shift, e.operator||"", e.area||"CCP Urea Plant",
       ...TAGS.map(t=>{ const v=e.readings?.[t.id]; return (v===undefined||v===null)?"":v; }),
-      e.status||"", e.reviewedBy||"",
+      e.status||"", e.reviewedBy||"", e.editedBy||"", editTrailStr,
       e.createdAt?new Date(e.createdAt).toLocaleString('en-IN'):"",
       (e.alertTags||[]).map(tid=>{const t=TAGS.find(x=>x.id===tid);return t?t.name:tid;}).join("; "),
       e.imported?"Yes":"No"
