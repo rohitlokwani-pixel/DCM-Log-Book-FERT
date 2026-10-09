@@ -13,6 +13,7 @@
 <link rel="manifest" href="manifest.json">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <script>window.Chart||document.write('<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"><\/script>')</script>
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4.4.1/dist/email.min.js"></script>
 <script>/* jsQR v1.4.0 embedded inline - no network dependency for QR scanning */
 (function webpackUniversalModuleDefinition(root, factory) {
 	if(typeof exports === 'object' && typeof module === 'object')
@@ -10917,6 +10918,31 @@ function toast(msg,ms=2500){ const t=document.getElementById("toast"); t.textCon
 function log_audit(actor,action,detail){ auditLog.unshift({ts:new Date().toISOString(),actor,action,detail}); }
 function notify(to,subject,body){ notifications.unshift({ts:new Date().toISOString(),to,subject,body}); }
 
+// ══ EMAIL ALERTS (EmailJS) ══
+const EMAILJS_SERVICE  = "service_4yebdbg";
+const EMAILJS_TEMPLATE = "template_9c5pcmv";
+const EMAILJS_PUBLICKEY= "aAxOBWp1mzRaUhqey";
+try{ if(window.emailjs){ emailjs.init({publicKey: EMAILJS_PUBLICKEY}); } }catch(e){}
+function esc(s){ return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+async function sendMail(subject, messageHtml){
+  try{
+    if(!window.emailjs){ console.warn("EmailJS not loaded"); return; }
+    await emailjs.send(EMAILJS_SERVICE, EMAILJS_TEMPLATE, {subject: subject, message_html: messageHtml});
+    log_audit("System","Email sent", subject);
+  }catch(err){
+    console.warn("Email send failed", err);
+    log_audit("System","Email FAILED", subject+" — "+(err&&err.text?err.text:err));
+  }
+}
+function mailWrap(bannerHtml, rows){
+  const rowHtml = rows.map(r=>`<tr><td style="padding:7px 0;border-bottom:1px solid #f0f3f8;color:#6b7c93;font-weight:600;font-size:13px;width:140px;vertical-align:top">${r[0]}</td><td style="padding:7px 0;border-bottom:1px solid #f0f3f8;color:#1a2433;font-size:13px">${r[1]}</td></tr>`).join("");
+  return `<div style="font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;max-width:600px;margin:0 auto;color:#1a2433">
+    ${bannerHtml}
+    <table style="width:100%;border-collapse:collapse">${rowHtml}</table>
+    <div style="margin-top:14px;padding-top:10px;border-top:1px solid #eef1f6;font-size:11px;color:#9aa8bd">Automated message from CCP Urea Plant Digital Logbook · Beta</div>
+  </div>`;
+}
+
 // Logbook starts empty — entries are created live by operators or via CSV historical import.
 log_audit("System","Logbook initialized","CCP Urea Plant digital logbook started.");
 
@@ -10984,7 +11010,7 @@ function buildTabs(){
     download:{label:"⬇️ Download",roles:["operator","incharge","hod","admin"]},
     review:{label:"⏳ Review",roles:["incharge"]},
     incidents:{label:"🚨 Incidents",roles:["incharge","hod","admin"]},
-    audit:{label:"📋 Audit",roles:["incharge","admin"]},
+    audit:{label:"📋 Audit",roles:["incharge","hod","admin"]},
     admin:{label:"⚙️ Admin",roles:["admin"]},
   };
   const row=document.getElementById("tabs_row"); row.innerHTML="";
@@ -11473,9 +11499,18 @@ async function confirmIncident(){
   incidents.unshift(incident);
   await sb.from('audit_log').insert({actor:reporter, action:'🚨 INCIDENT REPORTED', detail:desc}).catch(()=>{});
   log_audit(reporter,"🚨 INCIDENT REPORTED", desc);
-  notify(settings.recipients.incharge,"🚨 INCIDENT — CCP Urea Plant", desc+" (reported by "+reporter+")");
+  // Immediate email to HoD + team
+  const _now = new Date();
+  const incSubj = `🚨 INCIDENT REPORTED — CCP Urea Plant — ${_now.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})}`;
+  const incBanner = `<div style="border-radius:10px;padding:12px 14px;font-weight:700;font-size:14px;margin-bottom:14px;background:#fdecec;border:1px solid #d64545;color:#a12020">🚨 Immediate attention required</div>`;
+  const incHtml = mailWrap(incBanner, [
+    ["Reported by", `${esc(reporter)} · ${_now.toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit',hour12:true})}`],
+    ["Area", "CCP Urea Plant"],
+    ["Details", esc(desc)]
+  ]);
+  sendMail(incSubj, incHtml);
   notify(settings.recipients.hod,"🚨 INCIDENT — CCP Urea Plant", desc+" (reported by "+reporter+")");
-  toast("🚨 Incident reported — Incharge and HoD notified");
+  toast("🚨 Incident reported — email sent to HoD & team");
 }
 
 // ══ RECORDS ══
@@ -11532,10 +11567,19 @@ function renderRecords(){
     const badgeClass = e.status==="Reviewed"?"b-ok":e.status==="Pending Review"?"b-pending":"b-rejected";
     const alertBadge = e.alertTags?.length ? `<span class="badge b-alert">🚨 ${e.alertTags.length}</span>`:"";
     const importedBadge = e.imported ? `<span class="badge" style="background:#e2e3e5;color:#41464b">📥 Imported</span>`:"";
-    const rows = Object.entries(e.readings||{}).slice(0,6).map(([k,v])=>{
+    const _showAllParams = currentRole!=="operator"; // Incharge/HoD/Admin see all parameters; operator sees compact
+    const _allReadings = Object.entries(e.readings||{});
+    const rows = (_showAllParams?_allReadings:_allReadings.slice(0,6)).map(([k,v])=>{
       const t=TAGS.find(x=>x.id===k); const st=t?tagStatus(t,v):null;
       return `<tr><td class="k">${t?t.name:k}</td><td class="v ${st==='high'||st==='low'?'hot':''}">${v} ${t?t.unit:''}</td></tr>`;
     }).join("");
+
+    // Value-change trail — visible to Incharge, HoD and Admin (not operator) so edits are transparent
+    const editTrailBlock = (currentRole!=="operator" && e.editLog && e.editLog.length) ? `
+      <div style="background:#fff8e1;border:1px solid #f9a825;border-radius:8px;padding:8px;margin-top:6px">
+        <div style="font-size:10px;font-weight:800;color:#e65100;margin-bottom:4px">✏️ VALUE CHANGES (by Shift Incharge)</div>
+        ${e.editLog.map(log=>`<div style="font-size:10px;color:#5d4037;padding:2px 0;line-height:1.4">${(log.changes||[]).map(c=>`<strong>${c.param}</strong>: ${c.old} → <strong>${c.new}</strong>`).join("&nbsp;·&nbsp;")} <span style="color:#8d6e63">— by ${log.by||'Incharge'}${log.at?' on '+new Date(log.at).toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}):''}</span></div>`).join("")}
+      </div>` : "";
 
     // Rejection notice with resubmit button — only shown to the operator who submitted
     const rejectionBlock = e.status==="Rejected" ? `
@@ -11563,8 +11607,9 @@ function renderRecords(){
         </div>
       </div>
       <table class="mt">${rows}</table>
-      <div class="mini">Showing 6 of ${Object.keys(e.readings||{}).length} tags — full detail in Download/Analysis</div>
+      <div class="mini">${_showAllParams?`${Object.keys(e.readings||{}).length} parameters`:`Showing 6 of ${Object.keys(e.readings||{}).length} tags — full detail in Download/Analysis`}</div>
       ${e.reviewedBy && e.status==="Reviewed"?`<div style="background:#e0f2f1;border-radius:6px;padding:5px 8px;margin-top:6px;font-size:10px;color:#00695c">✅ Reviewed by <strong>${e.reviewedBy}</strong> at ${e.reviewedAt?new Date(e.reviewedAt).toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}):''}</div>`:""}
+      ${editTrailBlock}
       ${rejectionBlock}
     </div>`;
   }).join("");
@@ -11775,13 +11820,43 @@ async function confirmShiftApprove(){
   await sb.from('audit_log').insert({actor:name,action:anyEdit?'Shift approved & edited':'Shift approved',detail:`${shift} ${date} — ${shiftEntries.length} entries by ${name}${allEditLogs.length?" · Edits: "+allEditLogs.join(" | "):""}`}).catch(()=>{});
   log_audit(name, anyEdit?"Shift approved & edited":"Shift approved", `${shift} ${date}`);
 
-  // Notify HoD + Control Room
-  const subj = `✅ Shift Approved — ${shift} ${date} — CCP Urea Plant`;
-  const body = `${shift} on ${date} approved${anyEdit?" (with edits)":""} by ${name}. ${shiftEntries.length} entries, ${alertsInShift} alert(s).`;
-  notify(settings.recipients.hod, subj, body);
-  if(settings.recipients.incharge) notify(settings.recipients.incharge, subj, body);
+  // ── Build consolidated email: alerts in header, remarks + value changes in body ──
+  // Collect alert details across the shift (after edits applied)
+  const alertChips = [];
+  shiftEntries.forEach(e=>{
+    (e.alertTags||[]).forEach(tid=>{
+      const t=TAGS.find(x=>x.id===tid); const v=e.readings?.[tid];
+      const st = t?tagStatus(t, parseFloat(v)):'';
+      alertChips.push(`${t?t.name:tid} @ ${e.hour.slice(0,2)}:${e.hour.slice(2)} (${(st||'').toUpperCase()})`);
+    });
+  });
+  // Collect remarks
+  const remarkList = shiftEntries.filter(e=>e.remarks && e.remarks.trim()).map(e=>`${e.hour.slice(0,2)}:${e.hour.slice(2)} — "${esc(e.remarks)}"`);
+  // Collect value changes
+  const changeRows = [];
+  shiftEntries.forEach(e=>{ (e.editLog||[]).forEach(log=>{ (log.changes||[]).forEach(c=>{ changeRows.push(`${esc(c.param)}: ${esc(c.old)} → <strong>${esc(c.new)}</strong> <span style="color:#8d6e63">(${e.hour.slice(0,2)}:${e.hour.slice(2)}, by ${esc(log.by||name)})</span>`); }); }); });
 
-  toast(`✅ ${shift} approved${anyEdit?" & edits saved":""} — HoD notified`);
+  const nAlerts = alertChips.length;
+  const subj = nAlerts
+    ? `🚨 ${shift} Approved (${nAlerts} Alert${nAlerts>1?'s':''}) — ${date} — CCP Urea Plant`
+    : `✅ ${shift} Approved — ${date} — CCP Urea Plant`;
+  const banner = nAlerts
+    ? `<div style="border-radius:10px;padding:12px 14px;font-weight:700;font-size:14px;margin-bottom:14px;background:#fff4e5;border:1px solid #f0a500;color:#9a5b00">⚠️ ${nAlerts} alert reading${nAlerts>1?'s':''} during this shift — review recommended</div>`
+    : `<div style="border-radius:10px;padding:12px 14px;font-weight:700;font-size:14px;margin-bottom:14px;background:#e9f8ef;border:1px solid #37a06a;color:#1d6e42">✅ All readings within range — no alerts this shift</div>`;
+  const rows = [
+    ["Shift", `${esc(shift)} · ${esc(date)}`],
+    ["Approved by", `${esc(name)}${anyEdit?' (with edits)':''}`],
+    ["Entries logged", `${shiftEntries.length} hourly entries`]
+  ];
+  if(nAlerts) rows.push(["🚨 Alerts", alertChips.map(a=>`<span style="display:inline-block;background:#fff4e5;color:#9a5b00;border:1px solid #f0c680;border-radius:16px;padding:2px 9px;font-size:11px;font-weight:700;margin:2px 4px 2px 0">${esc(a)}</span>`).join("")]);
+  if(changeRows.length) rows.push(["✏️ Value changes", changeRows.join("<br>")]);
+  rows.push(["📝 Remarks", remarkList.length ? remarkList.join("<br>") : "No remarks"]);
+  const html = mailWrap(banner, rows);
+  sendMail(subj, html);
+  // keep in-app notification log too
+  notify(settings.recipients.hod, subj, "Shift approved — see email");
+
+  toast(`✅ ${shift} approved${anyEdit?" & edits saved":""} — email sent to HoD & team`);
   await loadFromSupabase();
   renderPendingReviews();
 }
