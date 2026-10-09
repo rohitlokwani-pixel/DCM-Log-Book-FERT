@@ -11836,12 +11836,46 @@ async function confirmShiftApprove(){
   const changeRows = [];
   shiftEntries.forEach(e=>{ (e.editLog||[]).forEach(log=>{ (log.changes||[]).forEach(c=>{ changeRows.push(`${esc(c.param)}: ${esc(c.old)} → <strong>${esc(c.new)}</strong> <span style="color:#8d6e63">(${e.hour.slice(0,2)}:${e.hour.slice(2)}, by ${esc(log.by||name)})</span>`); }); }); });
 
+  // Collect SEAL LEAKAGE (text fields — no numeric alarm, but must be monitored in header)
+  const SEAL_TAGS = ["LEAK_MAIN_LP","LEAK_MAIN_HP","LEAK_BOOSTER"];
+  const negRe = /^(nil|no|none|normal|ok|na|n\/?a|-|–|0|clear|no ?leak(age)?|not? ?observed|nb|nd)$/i;
+  const sealRows = [];   // all recorded seal leakage (always shown)
+  const sealFlags = [];  // any value written (flag in header)
+  const sealLeaks = [];  // actual leaks only (non-nil)
+  shiftEntries.forEach(e=>{
+    SEAL_TAGS.forEach(tid=>{
+      const t=TAGS.find(x=>x.id===tid); if(!t) return;
+      const v=(e.readings && e.readings[tid]!=null ? String(e.readings[tid]) : "").trim();
+      if(!v) return;
+      const label = t.name.replace("Seal Leakage — ","");
+      const isLeak = !negRe.test(v);
+      const hh = `${e.hour.slice(0,2)}:${e.hour.slice(2)}`;
+      if(isLeak){
+        // Highlighted red box — stands out for monitoring
+        sealRows.push(`<div style="display:inline-block;background:#fdecec;border:1.5px solid #d64545;border-radius:8px;padding:5px 10px;margin:3px 4px 3px 0;color:#a12020;font-weight:800;font-size:13px">🔴 ${esc(label)}: ${esc(v)} <span style="font-weight:600;color:#8d6e63">(${hh})</span></div>`);
+      } else {
+        sealRows.push(`<div style="display:inline-block;background:#eef8f1;border:1px solid #9fd3b4;border-radius:8px;padding:4px 9px;margin:3px 4px 3px 0;color:#1d6e42;font-size:12px">✅ ${esc(label)}: ${esc(v)} <span style="color:#8d6e63">(${hh})</span></div>`);
+      }
+      sealFlags.push(`${label} @ ${hh}: ${v}`);      // any value written → appears in header
+      if(isLeak) sealLeaks.push(`${label} @ ${hh}: ${v}`); // actual leak (red)
+    });
+  });
+  const nSeal = sealFlags.length;      // any seal-leakage value recorded
+  const nSealLeak = sealLeaks.length;  // actual leaks (non-nil)
+
   const nAlerts = alertChips.length;
-  const subj = nAlerts
-    ? `🚨 ${shift} Approved (${nAlerts} Alert${nAlerts>1?'s':''}) — ${date} — CCP Urea Plant`
+  const flagged = nAlerts>0 || nSeal>0;
+  const subjBits = [];
+  if(nAlerts) subjBits.push(`${nAlerts} Alert${nAlerts>1?'s':''}`);
+  if(nSeal) subjBits.push(nSealLeak? `Seal Leak` : `Seal Chk`);
+  const subj = flagged
+    ? `🚨 ${shift} Approved (${subjBits.join(' + ')}) — ${date} — CCP Urea Plant`
     : `✅ ${shift} Approved — ${date} — CCP Urea Plant`;
-  const banner = nAlerts
-    ? `<div style="border-radius:10px;padding:12px 14px;font-weight:700;font-size:14px;margin-bottom:14px;background:#fff4e5;border:1px solid #f0a500;color:#9a5b00">⚠️ ${nAlerts} alert reading${nAlerts>1?'s':''} during this shift — review recommended</div>`
+  let bannerParts = [];
+  if(nAlerts) bannerParts.push(`${nAlerts} alert reading${nAlerts>1?'s':''}`);
+  if(nSeal) bannerParts.push(nSealLeak? `🔧 seal leakage reported` : `🔧 seal leakage checked`);
+  const banner = flagged
+    ? `<div style="border-radius:10px;padding:12px 14px;font-weight:700;font-size:14px;margin-bottom:14px;background:#fff4e5;border:1px solid #f0a500;color:#9a5b00">⚠️ ${bannerParts.join(' · ')} during this shift — review recommended</div>`
     : `<div style="border-radius:10px;padding:12px 14px;font-weight:700;font-size:14px;margin-bottom:14px;background:#e9f8ef;border:1px solid #37a06a;color:#1d6e42">✅ All readings within range — no alerts this shift</div>`;
   const rows = [
     ["Shift", `${esc(shift)} · ${esc(date)}`],
@@ -11849,6 +11883,7 @@ async function confirmShiftApprove(){
     ["Entries logged", `${shiftEntries.length} hourly entries`]
   ];
   if(nAlerts) rows.push(["🚨 Alerts", alertChips.map(a=>`<span style="display:inline-block;background:#fff4e5;color:#9a5b00;border:1px solid #f0c680;border-radius:16px;padding:2px 9px;font-size:11px;font-weight:700;margin:2px 4px 2px 0">${esc(a)}</span>`).join("")]);
+  if(sealRows.length) rows.push(["🔧 Seal Leakage", sealRows.join("")]);
   if(changeRows.length) rows.push(["✏️ Value changes", changeRows.join("<br>")]);
   rows.push(["📝 Remarks", remarkList.length ? remarkList.join("<br>") : "No remarks"]);
   const html = mailWrap(banner, rows);
