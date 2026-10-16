@@ -10874,6 +10874,7 @@ let entries = [];
 let auditLog = [];
 let notifications = [];
 let incidents = [];
+let _emailedShifts = new Set(); // dedupe: one approval email per date+shift
 let entryIdSeq = 1000;
 let supabaseReady = false;
 let _pendingReviewId = null;
@@ -11402,7 +11403,7 @@ async function submitHourEntry(){
   if(missing.length){ toast(`⚠️ Fill all fields (${missing.length} missing) — check each section tab`); return; }
 
   const alertTags = TAGS.filter(t=>{ 
-    if(t.type==="text"||t.type==="select"||t.type==="motor") return false; // no alerts on these
+    if(t.type==="text"||t.type==="select") return false; // motor amperes can alarm (standby motor is blank → no value → no false alarm)
     if(t.type==="leak"){ const st=tagStatus(t,readings[t.id]); return st==="high"; } // only Heavy leak alerts
     const st=tagStatus(t,readings[t.id]); return st==="high"||st==="low"; 
   }).map(t=>t.id);
@@ -11820,10 +11821,14 @@ async function confirmShiftApprove(){
   await sb.from('audit_log').insert({actor:name,action:anyEdit?'Shift approved & edited':'Shift approved',detail:`${shift} ${date} — ${shiftEntries.length} entries by ${name}${allEditLogs.length?" · Edits: "+allEditLogs.join(" | "):""}`}).catch(()=>{});
   log_audit(name, anyEdit?"Shift approved & edited":"Shift approved", `${shift} ${date}`);
 
-  // ── Build consolidated email: alerts in header, remarks + value changes in body ──
-  // Collect alert details across the shift (after edits applied)
+  // ── Build consolidated email: ONE email per shift, covering ALL hours logged ──
+  const emailEntries = entries.filter(e=>e.date===date && e.shift===shift)
+    .sort((a,b)=>{const hA=parseInt(a.hour),hB=parseInt(b.hour);return (hA>=700?hA:hA+2400)-(hB>=700?hB:hB+2400);}); // all hours of this shift, in order
+  const _shiftKey = date+"|"+shift;
+  const _alreadyEmailed = _emailedShifts.has(_shiftKey) || (auditLog||[]).some(a=>a.action==='Shift email sent' && a.detail===_shiftKey);
+  // Collect alert details across the whole shift (after edits applied)
   const alertChips = [];
-  shiftEntries.forEach(e=>{
+  emailEntries.forEach(e=>{
     (e.alertTags||[]).forEach(tid=>{
       const t=TAGS.find(x=>x.id===tid); const v=e.readings?.[tid];
       const st = t?tagStatus(t, parseFloat(v)):'';
@@ -11831,10 +11836,10 @@ async function confirmShiftApprove(){
     });
   });
   // Collect remarks
-  const remarkList = shiftEntries.filter(e=>e.remarks && e.remarks.trim()).map(e=>`${e.hour.slice(0,2)}:${e.hour.slice(2)} — "${esc(e.remarks)}"`);
+  const remarkList = emailEntries.filter(e=>e.remarks && e.remarks.trim()).map(e=>`${e.hour.slice(0,2)}:${e.hour.slice(2)} — "${esc(e.remarks)}"`);
   // Collect value changes
   const changeRows = [];
-  shiftEntries.forEach(e=>{ (e.editLog||[]).forEach(log=>{ (log.changes||[]).forEach(c=>{ changeRows.push(`${esc(c.param)}: ${esc(c.old)} → <strong>${esc(c.new)}</strong> <span style="color:#8d6e63">(${e.hour.slice(0,2)}:${e.hour.slice(2)}, by ${esc(log.by||name)})</span>`); }); }); });
+  emailEntries.forEach(e=>{ (e.editLog||[]).forEach(log=>{ (log.changes||[]).forEach(c=>{ changeRows.push(`${esc(c.param)}: ${esc(c.old)} → <strong>${esc(c.new)}</strong> <span style="color:#8d6e63">(${e.hour.slice(0,2)}:${e.hour.slice(2)}, by ${esc(log.by||name)})</span>`); }); }); });
 
   // Collect SEAL LEAKAGE (text fields — no numeric alarm, but must be monitored in header)
   const SEAL_TAGS = ["LEAK_MAIN_LP","LEAK_MAIN_HP","LEAK_BOOSTER"];
@@ -11842,7 +11847,7 @@ async function confirmShiftApprove(){
   const sealRows = [];   // all recorded seal leakage (always shown)
   const sealFlags = [];  // any value written (flag in header)
   const sealLeaks = [];  // actual leaks only (non-nil)
-  shiftEntries.forEach(e=>{
+  emailEntries.forEach(e=>{
     SEAL_TAGS.forEach(tid=>{
       const t=TAGS.find(x=>x.id===tid); if(!t) return;
       const v=(e.readings && e.readings[tid]!=null ? String(e.readings[tid]) : "").trim();
@@ -11880,18 +11885,23 @@ async function confirmShiftApprove(){
   const rows = [
     ["Shift", `${esc(shift)} · ${esc(date)}`],
     ["Approved by", `${esc(name)}${anyEdit?' (with edits)':''}`],
-    ["Entries logged", `${shiftEntries.length} hourly entries`]
+    ["Entries logged", `${emailEntries.length} hourly entries`]
   ];
   if(nAlerts) rows.push(["🚨 Alerts", alertChips.map(a=>`<span style="display:inline-block;background:#fff4e5;color:#9a5b00;border:1px solid #f0c680;border-radius:16px;padding:2px 9px;font-size:11px;font-weight:700;margin:2px 4px 2px 0">${esc(a)}</span>`).join("")]);
   if(sealRows.length) rows.push(["🔧 Seal Leakage", sealRows.join("")]);
   if(changeRows.length) rows.push(["✏️ Value changes", changeRows.join("<br>")]);
   rows.push(["📝 Remarks", remarkList.length ? remarkList.join("<br>") : "No remarks"]);
   const html = mailWrap(banner, rows);
-  sendMail(subj, html);
-  // keep in-app notification log too
-  notify(settings.recipients.hod, subj, "Shift approved — see email");
-
-  toast(`✅ ${shift} approved${anyEdit?" & edits saved":""} — email sent to HoD & team`);
+  // Send only ONE email per shift (dedupe). Later approvals of the same shift won't re-send.
+  if(!_alreadyEmailed){
+    sendMail(subj, html);
+    _emailedShifts.add(_shiftKey);
+    sb.from('audit_log').insert({actor:'System',action:'Shift email sent',detail:_shiftKey}).catch(()=>{});
+    notify(settings.recipients.hod, subj, "Shift approved — see email");
+    toast(`✅ ${shift} approved — shift email sent to HoD & team`);
+  } else {
+    toast(`✅ ${shift} approved — entries added (email already sent for this shift)`);
+  }
   await loadFromSupabase();
   renderPendingReviews();
 }
@@ -13534,7 +13544,7 @@ function renderAdmin(){
     const h=document.createElement("div"); h.style.cssText="font-size:10px;font-weight:800;color:var(--muted);margin:8px 0 4px;text-transform:uppercase";
     h.textContent=s.label; wrap.appendChild(h);
     TAGS.filter(t=>t.section===s.id).forEach(t=>{
-      if(t.type==="text"||t.type==="select"||t.type==="motor") return; // no ranges for non-numeric
+      if(t.type==="text"||t.type==="select") return; // motor amperes are numeric → allow range/alarm edit
       const r = settings.ranges[t.id];
       const div=document.createElement("div"); div.style.marginBottom="12px"; div.style.padding="10px"; div.style.background="#fafbff"; div.style.borderRadius="8px"; div.style.border="1px solid var(--border)";
       const alertOn = r.alertEnabled !== false;
@@ -13561,7 +13571,7 @@ function renderAdmin(){
 }
 async function saveThresholds(){
   TAGS.forEach(t=>{
-    if(t.type==="text"||t.type==="select"||t.type==="motor") return;
+    if(t.type==="text"||t.type==="select") return;
     const rminEl=document.getElementById("rmin_"+t.id);
     if(!rminEl) return;
     const rmin=rminEl.value, rmax=document.getElementById("rmax_"+t.id).value;
